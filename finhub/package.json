@@ -1,0 +1,42 @@
+{
+  "name": "finhub-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Personal Finance Hub frontend: dashboard, advisor chat, reports and holdings.",
+  "scripts": {
+    "dev": "next dev --hostname 127.0.0.1",
+    "build": "next build",
+    "start": "next start --hostname 127.0.0.1",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test:api": "node --test scripts/test-api.cjs"
+  },
+  "engines": {
+    "node": ">=18.17"
+  },
+  "dependencies": {
+    "@fontsource/doto": "5.3.0",
+    "@fontsource/instrument-serif": "5.3.0",
+    "@fontsource/plus-jakarta-sans": "5.3.0",
+    "clsx": "2.1.1",
+    "lucide-react": "1.70.0",
+    "next": "14.2.35",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "react-markdown": "9.1.0",
+    "recharts": "2.15.4",
+    "remark-gfm": "4.0.1",
+    "swr": "2.5.1"
+  },
+  "devDependencies": {
+    "@types/node": "20.19.43",
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7",
+    "autoprefixer": "10.6.2",
+    "eslint": "8.57.1",
+    "eslint-config-next": "14.2.35",
+    "postcss": "8.5.32",
+    "tailwindcss": "3.4.19",
+    "typescript": "5.9.3"
+  }
+}

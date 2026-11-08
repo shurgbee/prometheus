@@ -205,4 +205,5 @@ def emit(session, kind, payload):
 
 
 def row_dict(row, exclude=()):
-    return {c.name: getattr(row, c.name) for c in row.__table__.columns if c.name not in exclude}
+    return {c.name: (aware(value) if isinstance(value := getattr(row, c.name), datetime) else value)
+            for c in row.__table__.columns if c.name not in exclude}

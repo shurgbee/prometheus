@@ -4,6 +4,7 @@ from datetime import date
 from sqlalchemy import select
 
 from .db import Holding, aware, now
+from .market import market_open
 from .policy import cd_value
 
 
@@ -55,6 +56,9 @@ async def portfolio(db, providers, refresh=True):
             item["gain"] = value - data["cost_basis"] if value is not None else None
             item["gain_percent"] = (item["gain"] / data["cost_basis"] * 100
                                     if value is not None and data["cost_basis"] else None)
+        item["day_change"] = round(value - previous, 2) if value is not None and previous is not None else None
+        item["day_change_percent"] = ((value / previous - 1) * 100
+                                      if value is not None and previous else None)
         item["value"] = round(value, 2) if value is not None else None
         allocation["stocks" if asset == "stock" else asset] += value or 0
         complete = complete and value is not None and previous is not None
@@ -67,4 +71,5 @@ async def portfolio(db, providers, refresh=True):
             "allocation": {k: round(v, 2) for k, v in allocation.items()}, "holdings": rows,
             "day_change": round(total - previous_total, 2) if complete else None,
             "day_change_percent": round((total / previous_total - 1) * 100, 3) if complete and previous_total else None,
-            "complete": complete, "warnings": warnings, "demo": providers.settings.demo_mode, "as_of": now()}
+            "complete": complete, "warnings": warnings, "demo": providers.settings.demo_mode, "as_of": now(),
+            "market_open": market_open(), "dev_injection_enabled": providers.settings.enable_dev_injection}

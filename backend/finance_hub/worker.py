@@ -5,28 +5,18 @@ import hashlib
 import logging
 import os
 from contextlib import asynccontextmanager
-from functools import lru_cache
 
 from sqlalchemy import select, text
 
 from .config import Settings
 from .db import Database, Snapshot, Trigger, now
+from .market import market_open
 from .portfolio import portfolio
 from .providers import Providers
 from .research import ResearchService
 from .triggers import TriggerService
 
 logger = logging.getLogger("finance_hub.worker")
-
-
-@lru_cache(maxsize=1)
-def calendar():
-    import exchange_calendars
-    return exchange_calendars.get_calendar("XNYS")
-
-
-def market_open():
-    return calendar().is_open_on_minute(now().replace(second=0, microsecond=0))
 
 
 @asynccontextmanager

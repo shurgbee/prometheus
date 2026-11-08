@@ -1,0 +1,153 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    background-color: theme("colors.plane");
+  }
+  body {
+    @apply bg-plane font-sans text-base text-ink antialiased;
+    /* Faint dot grid on the page plane only. */
+    background-image: radial-gradient(rgba(237, 233, 228, 0.055) 1px, transparent 1px);
+    background-size: 22px 22px;
+    background-attachment: fixed;
+  }
+  ::selection {
+    background: rgba(127, 166, 245, 0.35);
+  }
+  :focus-visible {
+    outline: 2px solid theme("colors.accent.DEFAULT");
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+  button,
+  [role="button"] {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(237, 233, 228, 0.16) transparent;
+  }
+}
+
+@layer components {
+  .num {
+    font-variant-numeric: tabular-nums;
+  }
+  .hairline-dashed {
+    border-style: dashed;
+    border-color: theme("colors.line-strong");
+  }
+  .panel {
+    @apply rounded-lg border border-line bg-surface;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-pill px-3.5 py-1.5 text-sm font-medium transition-colors disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-accent text-accent-ink hover:bg-[#9ab9f8];
+  }
+  .btn-ghost {
+    @apply btn border border-line-strong text-ink-2 hover:bg-raised hover:text-ink;
+  }
+  .btn-quiet {
+    @apply btn px-2.5 text-ink-2 hover:bg-raised hover:text-ink;
+  }
+  .field {
+    @apply w-full rounded border border-line-strong bg-raised px-3 py-2 text-sm text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none;
+  }
+  .section-title {
+    @apply font-serif text-2xl font-normal text-ink;
+  }
+  .label {
+    @apply text-xs text-ink-3;
+  }
+}
+
+/* Long-form markdown: reports and agent replies. */
+.prose-fin {
+  @apply text-ink-2;
+  line-height: 1.65;
+}
+.prose-fin > * + * {
+  margin-top: 0.75em;
+}
+.prose-fin h1,
+.prose-fin h2,
+.prose-fin h3 {
+  @apply font-serif font-normal text-ink;
+  margin-top: 1.4em;
+}
+.prose-fin h1 {
+  @apply text-2xl;
+}
+.prose-fin h2 {
+  @apply text-xl;
+}
+.prose-fin h3 {
+  @apply text-lg;
+}
+.prose-fin strong {
+  @apply font-semibold text-ink;
+}
+.prose-fin a {
+  @apply text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent;
+}
+.prose-fin ul {
+  list-style: disc;
+  padding-left: 1.2em;
+}
+.prose-fin ol {
+  list-style: decimal;
+  padding-left: 1.4em;
+}
+.prose-fin li + li {
+  margin-top: 0.3em;
+}
+.prose-fin li::marker {
+  color: theme("colors.ink.3");
+}
+.prose-fin blockquote {
+  @apply border-l-2 border-line-strong pl-3 text-ink-2;
+}
+.prose-fin code {
+  @apply rounded-sm bg-raised px-1 py-0.5 text-[0.9em] text-ink;
+}
+.prose-fin pre {
+  @apply overflow-x-auto rounded bg-raised p-3;
+}
+.prose-fin pre code {
+  @apply bg-transparent p-0;
+}
+.prose-fin table {
+  @apply w-full border-collapse text-sm;
+}
+.prose-fin th,
+.prose-fin td {
+  @apply border-b border-line px-2 py-1.5 text-left;
+}
+.prose-fin th {
+  @apply font-medium text-ink;
+}
+.prose-fin hr {
+  @apply border-line;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

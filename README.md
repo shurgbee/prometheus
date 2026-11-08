@@ -1,6 +1,28 @@
 # Finance Hub backend
 
-FastAPI and a separate durable worker implement Dev A's reduced hackathon MVP in [SPEC.md](SPEC.md). The frontend and TypeScript Photon/LiveKit/Riva notifier are separate work owned by Dev B. No trades are executed.
+FastAPI and a separate durable worker implement Dev A's reduced hackathon MVP in [SPEC.md](SPEC.md). The Next.js frontend in `finhub/` is integrated through a same-origin server proxy. The TypeScript Photon/LiveKit/Riva notifier remains a separate service. No trades are executed.
+
+## Run the integrated app
+
+With the root `.env` configured for demo mode (copy `.env.example` only if `.env` does not exist):
+
+```sh
+uv sync --python 3.13 --extra dev
+cd finhub
+npm ci
+cd ..
+uv run python scripts/dev.py --seed
+```
+
+Open **http://127.0.0.1:3000**. The launcher starts FastAPI, the worker and Next.js, shares the backend
+bearer token with the Next.js server only, and stops the processes together on Ctrl-C. `--seed` loads
+optional fixtures only into an empty demo portfolio; omit it for an existing database. The frontend
+uses the real backend by default, including when that backend supplies labelled synthetic data.
+See [the frontend README](finhub/README.md) for manual startup and [the integrated contract](finhub/API_CONTRACT.md)
+for read models, percentage units, total position cost, approval edits and persisted chat recovery.
+
+This launcher binds the single-user app to loopback. Public deployments must protect access to the
+Next.js app; the server-to-server bearer token alone does not authenticate visitors to the frontend.
 
 ## Run locally
 
@@ -141,4 +163,4 @@ PYTHONPATH=backend python -m unittest discover -s tests -p test_policy.py -v
 
 The integration suite checks portfolio/CSV behavior, persisted approvals across application restart, editing/rejection, no trade execution, injected severity/deduplication/cooldowns, acknowledgement callbacks, durable demo delivery/global call limits, background research and similar-report exclusions. Live service tests require real credentials and are intentionally separate from these deterministic tests.
 
-In the implementation environment, downloads from PyPI were blocked by DNS/network restrictions. Five dependency-free policy tests and four schema/config tests (using locally cached Pydantic) passed, and all Python files compiled. The FastAPI/LangGraph/SQLAlchemy integration suite could not be executed there; run it after installing dependencies. Neither a real Tiger connection nor a real phone call has been verified.
+The backend integration suite and frontend client/proxy contract tests cover the local demo path. Run the commands above plus `npm run test:api`, `npm run typecheck`, `npm run lint` and `npm run build` inside `finhub`. Browser verification covered portfolio rendering, persisted approval cards after reload, edited approvals, research completion/search, normal and critical injection, acknowledgement, pause/resume, holdings CRUD and multipart CSV import, with no console errors or warnings. The 390px layout had no horizontal page overflow. No real Tiger connection or phone call has been verified; those require live service credentials.

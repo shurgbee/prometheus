@@ -146,3 +146,53 @@ def test_no_trading_tools(client):
     response = client.post("/api/chat", json={"message": "buy TSLA"})
     assert "cannot place trades" in parse_sse(response, "answer")[0]["text"]
     assert not parse_sse(response, "trigger_approval")
+
+
+def test_frontend_read_models_and_timezone_contract(client):
+    seed_holdings(client)
+    portfolio = client.get("/api/portfolio").json()
+    assert portfolio["complete"] and portfolio["demo"] and portfolio["dev_injection_enabled"]
+    assert isinstance(portfolio["market_open"], bool)
+    stock = next(h for h in portfolio["holdings"] if h["asset_class"] == "stock")
+    assert stock["cost_basis"] == 3500 and stock["day_change_percent"] == 0
+    trigger_id = create_watch(client)
+    result = inject(client, trigger_id).json()
+    alert = result["alert"]
+    assert alert["trigger_name"] == "Watch" and alert["rationale"]
+    assert abs(alert["breakdown"]["exposure"] - .4) < 1e-12
+    assert alert["demo"] and alert["created_at"].endswith("+00:00")
+    listed = client.get("/api/alerts").json()[0]
+    assert listed["breakdown"] == alert["breakdown"]
+    trigger = next(t for t in client.get("/api/triggers").json() if t["id"] == trigger_id)
+    assert trigger["last_severity"] == 85
+    acked = client.post(f"/api/alerts/{alert['id']}/ack").json()
+    assert acked["trigger_name"] == "Watch" and acked["breakdown"]
+    assert client.get("/api/networth/history?range=All").status_code == 200
+
+
+def test_failed_turn_can_be_recovered_without_treating_it_as_an_approval(client, app, monkeypatch):
+    from finance_hub.providers import ProviderError
+    enqueue = app.state.research.enqueue
+    calls = 0
+
+    async def fail_once(*args, **kwargs):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise ProviderError("Temporary test failure")
+        return await enqueue(*args, **kwargs)
+
+    monkeypatch.setattr(app.state.research, "enqueue", fail_once)
+    response = client.post("/api/chat", json={"message": "Write an EV research report"})
+    thread = parse_sse(response, "thread")[0]["thread_id"]
+    assert parse_sse(response, "error")
+    state = client.get(f"/api/chat/{thread}").json()
+    assert state["retryable"] and not state["awaiting_approval"]
+    assert client.post(f"/api/chat/{thread}/resume", json={"decisions": [
+        {"proposal_id": "not-an-approval", "action": "reject"}]}).status_code == 409
+    retried = client.post(f"/api/chat/{thread}/retry")
+    assert not parse_sse(retried, "error"), retried.text
+    assert parse_sse(retried, "done")
+    restored = client.get(f"/api/chat/{thread}").json()
+    assert not restored["retryable"]
+    assert restored["research_job"]["status"] == "queued"

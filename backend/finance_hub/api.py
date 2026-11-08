@@ -17,7 +17,7 @@ from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langgraph.types import Command
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import and_, select
 
 from .advisor import Advisor
 from .config import Settings
@@ -29,6 +29,7 @@ from .research import ResearchService, brief
 from .schemas import ChatInput, DeliveryUpdate, HoldingInput, InjectSignal, ResearchInput, ResumeInput
 from .schemas import TriggerCreate, TriggerPatch, seconds
 from .triggers import TriggerService
+from .views import alert_view, load_alert_view
 
 bearer = HTTPBearer(auto_error=False)
 logger = logging.getLogger("finance_hub.api")
@@ -266,7 +267,8 @@ def create_app(settings: Settings | None = None):
             raise HTTPException(404, "Thread not found")
         return {"thread_id": thread_id, "history": snapshot.values.get("history", []),
                 "proposals": snapshot.values.get("proposals", []), "awaiting_approval": bool(pending_approval(snapshot)),
-                "retryable": bool(snapshot.next) and not pending_approval(snapshot)}
+                "retryable": bool(snapshot.next) and not pending_approval(snapshot),
+                "research_job": snapshot.values.get("context", {}).get("research_job")}
 
     @app.post("/api/chat/{thread_id}/resume", dependencies=auth)
     async def resume(thread_id: str, data: ResumeInput, request: Request):
@@ -302,8 +304,11 @@ def create_app(settings: Settings | None = None):
     @app.get("/api/triggers", dependencies=auth)
     async def list_triggers():
         async with db.sessions() as session:
-            return [row_dict(t) for t in (await session.scalars(select(Trigger)
-                    .where(Trigger.status != "deleted").order_by(Trigger.created_at.desc()))).all()]
+            severity = (select(Evaluation.severity).where(Evaluation.trigger_id == Trigger.id)
+                        .order_by(Evaluation.ts.desc()).limit(1).correlate(Trigger).scalar_subquery())
+            rows = (await session.execute(select(Trigger, severity).where(Trigger.status != "deleted")
+                                           .order_by(Trigger.created_at.desc()))).all()
+            return [{**row_dict(t), "last_severity": last} for t, last in rows]
 
     @app.post("/api/triggers", status_code=201, dependencies=auth)
     async def create_trigger(data: TriggerCreate):
@@ -356,8 +361,11 @@ def create_app(settings: Settings | None = None):
                 query = query.where(Alert.acked_at.is_(None))
             elif status == "acked":
                 query = query.where(Alert.acked_at.is_not(None))
-            return [row_dict(a) for a in (await session.scalars(query.order_by(Alert.created_at.desc())
-                                                               .limit(limit))).all()]
+            query = query.add_columns(Trigger, Evaluation).join(Trigger, Alert.trigger_id == Trigger.id)
+            query = query.outerjoin(Evaluation, and_(Evaluation.id == Alert.evaluation_id,
+                                                     Evaluation.ts == Alert.evaluation_ts))
+            rows = (await session.execute(query.order_by(Alert.created_at.desc()).limit(limit))).all()
+            return [alert_view(a, t, e, settings.demo_mode) for a, t, e in rows]
 
     @app.post("/api/alerts/{alert_id}/ack", dependencies=auth)
     async def ack(alert_id: str):
@@ -366,7 +374,7 @@ def create_app(settings: Settings | None = None):
             item.acked_at, item.delivery_status = now(), "acknowledged"
             emit(session, "delivery_status", {"alert_id": item.id, "status": "acknowledged"})
             await session.commit()
-            return row_dict(item)
+            return await load_alert_view(session, item, settings.demo_mode)
 
     @app.post("/api/alerts/{alert_id}/snooze", dependencies=auth)
     async def snooze(alert_id: str, duration: str = Query("24h", pattern=r"^[1-9][0-9]{0,3}[mhd]$")):
@@ -377,7 +385,7 @@ def create_app(settings: Settings | None = None):
             item.snoozed_until = now() + timedelta(seconds=seconds(duration))
             emit(session, "alert_snoozed", {"alert_id": item.id, "until": item.snoozed_until.isoformat()})
             await session.commit()
-            return row_dict(item)
+            return await load_alert_view(session, item, settings.demo_mode)
 
     @app.patch("/api/internal/alerts/{alert_id}/delivery", dependencies=[Depends(require_notifier)])
     async def delivery_callback(alert_id: str, data: DeliveryUpdate):

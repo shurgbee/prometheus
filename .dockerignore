@@ -5,3 +5,7 @@
 *.db-*
 __pycache__
 .pytest_cache
+
+finhub/node_modules
+finhub/.next
+finhub/.env*

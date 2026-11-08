@@ -7,6 +7,7 @@ from .db import Alert, Evaluation, SignalEvent, Trigger, aware, emit, now, row_d
 from .policy import clamp, score_signal
 from .portfolio import portfolio
 from .schemas import Triage, seconds
+from .views import load_alert_view
 
 
 def credibility(source, publisher=""):
@@ -106,10 +107,10 @@ class TriggerService:
             emit(session, "trigger_status", {"trigger_id": trigger_id, "level": level,
                                               "last_checked_at": now().isoformat()})
             await session.commit()
-            return {"evaluation": row_dict(evaluation), "alert": row_dict(alert) if alert else None}
+            return {"evaluation": row_dict(evaluation), "alert": await load_alert_view(session, alert, self.providers.settings.demo_mode) if alert else None}
 
     async def poll_trigger(self, trigger):
-        from .worker import market_open
+        from .market import market_open
         schedule = dict(trigger.next_polls)
         for idx, signal in enumerate(trigger.spec["signals"]):
             key = str(idx)

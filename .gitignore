@@ -8,3 +8,5 @@ __pycache__/
 *.sqlite*
 *.egg-info/
 dist/
+
+.playwright-mcp/
