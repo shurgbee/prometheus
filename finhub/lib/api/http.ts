@@ -103,7 +103,8 @@ export const httpApi: FinanceApi = {
   getPortfolio: async () => normalizePortfolio(await request<BackendPortfolio>("/api/portfolio")),
   getNetWorthHistory: async (range) => {
     const raw = await request<{ series: import("./types").NetWorthPoint[] }>(`/api/networth/history?range=${range === "ALL" ? "All" : range}`);
-    return { range, points: raw.series };
+    // Snapshots are one per UTC day; the UI expects that calendar date, not the full timestamp.
+    return { range, points: raw.series.map((p) => ({ ...p, ts: p.ts.slice(0, 10) })) };
   },
   createHolding: (input) => request<Holding>("/api/holdings", json("POST", input)),
   updateHolding: (id, patch) => request<Holding>(`/api/holdings/${enc(id)}`, json("PATCH", patch)),

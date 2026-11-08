@@ -45,12 +45,14 @@ test('financial semantics: position cost, percentage units, missing prices and e
 });
 test('history, report listing/search and research jobs use backend envelopes', async () => {
   global.fetch = async (url) => {
-    if (url.includes('/networth/')) { assert.match(url, /range=All/); return respond({ series: [{ total: 100 }] }); }
+    if (url.includes('/networth/')) { assert.match(url, /range=All/); return respond({ series: [{ ts: '2026-11-08T00:00:00+00:00', total: 100 }] }); }
     if (url === '/api/reports') return respond({ reports: [report] });
     if (url.startsWith('/api/reports?')) return respond({ matches: [{ ...report, passage: 'Tax credits', score: .8 }], similar: [] });
     return respond({ id: 'j1', topic: 'EV', status: 'completed', report_id: 'r1', error: null });
   };
-  assert.equal((await httpApi.getNetWorthHistory('ALL')).points[0].total, 100);
+  const history = await httpApi.getNetWorthHistory('ALL');
+  assert.equal(history.points[0].total, 100);
+  assert.equal(history.points[0].ts, '2026-11-08'); // Calendar date, not the backend's full timestamp.
   assert.equal((await httpApi.searchReports()).results[0].report.id, 'r1');
   assert.equal((await httpApi.searchReports('subsidies')).results[0].passage, 'Tax credits');
   assert.equal((await httpApi.getResearchJob('j1')).job_id, 'j1');
