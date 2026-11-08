@@ -10,3 +10,5 @@ __pycache__/
 dist/
 
 .playwright-mcp/
+notifier/node_modules/
+notifier/data/

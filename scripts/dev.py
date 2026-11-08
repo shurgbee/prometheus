@@ -1,4 +1,7 @@
-"""Start the API, worker and finhub against the same root .env without exposing API_TOKEN to JS."""
+"""Start the API, worker, finhub and (in live mode) the Photon notifier against the same root .env.
+
+API_TOKEN is never exposed to JS.
+"""
 import argparse
 import os
 import signal
@@ -6,6 +9,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -15,6 +19,7 @@ def main():
     parser.add_argument("--seed", action="store_true", help="Load smoke-test fixtures if holdings are empty")
     parser.add_argument("--api-port", type=int, default=8000)
     parser.add_argument("--web-port", type=int, default=3000)
+    parser.add_argument("--no-notifier", action="store_true", help="Don't start the local Photon notifier")
     args = parser.parse_args()
     os.chdir(ROOT)
     from finance_hub.config import Settings
@@ -51,6 +56,14 @@ def main():
         ([sys.executable, "-m", "finance_hub.worker"], ROOT),
         (["node", str(next_cli), "dev", "--hostname", "127.0.0.1", "--port", str(args.web_port)], ROOT / "finhub"),
     ]
+    # Live alerts go worker -> notifier -> Photon. Run the notifier here when NOTIFIER_URL is local.
+    notifier_url = urlparse(settings.notifier_url)
+    if not settings.demo_mode and not args.no_notifier and notifier_url.hostname in ("127.0.0.1", "localhost"):
+        tsx_cli = ROOT / "notifier/node_modules/tsx/dist/cli.mjs"
+        if not tsx_cli.exists():
+            raise SystemExit("Install notifier dependencies first: cd notifier && npm install")
+        env["NOTIFIER_BACKEND_URL"] = f"http://127.0.0.1:{args.api_port}"
+        commands.append((["node", str(tsx_cli), "src/server.ts"], ROOT / "notifier"))
     children = []
     def stop(*_):
         raise KeyboardInterrupt
