@@ -11,7 +11,7 @@ const DAY = 86_400_000;
 
 const y = (severity: number) => PAD_Y + (1 - Math.max(0, Math.min(100, severity)) / 100) * (H - PAD_Y * 2);
 
-const LEVEL_COLOR = { ok: "#8F8780", normal: "#FAB219", critical: "#D03B3B" } as const;
+const LEVEL_COLOR = { ok: "#8F8780", normal: "#F0A92B", critical: "#E07A72" } as const;
 
 /**
  * 24-hour severity trace for one trigger, drawn like a seismograph.
@@ -65,23 +65,23 @@ export function SeverityTrace({ evaluations, label }: { evaluations: Evaluation[
     >
       <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="absolute inset-0 h-full w-full overflow-visible">
         {/* Threshold bands: above 75 calls, 40–75 texts. */}
-        <rect x={0} y={y(100)} width={W} height={y(75) - y(100)} fill="#D03B3B" opacity={0.06} />
-        <rect x={0} y={y(75)} width={W} height={y(40) - y(75)} fill="#FAB219" opacity={0.035} />
-        <line x1={0} x2={W} y1={y(75)} y2={y(75)} stroke="#D03B3B" strokeOpacity={0.45} strokeWidth={1} vectorEffect="non-scaling-stroke" />
-        <line x1={0} x2={W} y1={y(40)} y2={y(40)} stroke="#FAB219" strokeOpacity={0.35} strokeWidth={1} vectorEffect="non-scaling-stroke" />
-        <line x1={0} x2={W} y1={y(0)} y2={y(0)} stroke="rgba(237,233,228,0.12)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+        <rect x={0} y={y(100)} width={W} height={y(75) - y(100)} fill="#E07A72" opacity={0.06} />
+        <rect x={0} y={y(75)} width={W} height={y(40) - y(75)} fill="#F0A92B" opacity={0.035} />
+        <line x1={0} x2={W} y1={y(75)} y2={y(75)} stroke="#E07A72" strokeOpacity={0.45} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+        <line x1={0} x2={W} y1={y(40)} y2={y(40)} stroke="#F0A92B" strokeOpacity={0.35} strokeWidth={1} vectorEffect="non-scaling-stroke" />
+        <line x1={0} x2={W} y1={y(0)} y2={y(0)} stroke="rgba(255,255,255,0.12)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
         {path && (
-          <path d={path} fill="none" stroke="#B6AEA6" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+          <path d={path} fill="none" stroke="#A09C9C" strokeWidth={1.5} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
         )}
         {hovered && (
-          <line x1={hovered.x} x2={hovered.x} y1={0} y2={H} stroke="rgba(237,233,228,0.35)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+          <line x1={hovered.x} x2={hovered.x} y1={0} y2={H} stroke="rgba(255,255,255,0.35)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
         )}
       </svg>
       {/* Dots are HTML so they stay round while the SVG stretches. */}
       {flagged.map((p) => (
         <Dot key={p.e.ts} xPct={(p.x / W) * 100} yPx={p.y} color={LEVEL_COLOR[p.e.level]} />
       ))}
-      {lastPt && lastPt.e.level === "ok" && <Dot xPct={(lastPt.x / W) * 100} yPx={lastPt.y} color="#EDE9E4" small />}
+      {lastPt && lastPt.e.level === "ok" && <Dot xPct={(lastPt.x / W) * 100} yPx={lastPt.y} color="#F6F4F4" small />}
       <span aria-hidden className="pointer-events-none absolute -right-8 text-[10px] leading-none text-ink-3" style={{ top: y(75) - 5 }}>
         call
       </span>
@@ -116,7 +116,7 @@ function Dot({ xPct, yPx, color, small }: { xPct: number; yPx: number; color: st
         width: size,
         height: size,
         background: color,
-        boxShadow: "0 0 0 2px #14110F",
+        boxShadow: "0 0 0 2px #151516",
       }}
     />
   );

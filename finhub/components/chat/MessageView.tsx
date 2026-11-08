@@ -13,8 +13,8 @@ export function MessageView({ message, live }: { message: Message; live: boolean
   if (message.role === "user") {
     const text = message.parts.find((p) => p.kind === "text");
     return (
-      <li className="flex justify-end">
-        <p className="max-w-[85%] whitespace-pre-wrap rounded-lg rounded-br-sm bg-raised px-3.5 py-2 text-sm text-ink">
+      <li>
+        <p className="whitespace-pre-wrap font-display text-xl leading-snug tracking-[-0.01em] text-ink sm:text-2xl">
           {text?.kind === "text" ? text.text : ""}
         </p>
       </li>
@@ -23,7 +23,7 @@ export function MessageView({ message, live }: { message: Message; live: boolean
 
   const empty = message.parts.length === 0;
   return (
-    <li className="space-y-3" aria-busy={live || undefined}>
+    <li className="space-y-4 border-b border-line pb-8 last:border-0 last:pb-0" aria-busy={live || undefined}>
       {empty && live && (
         <p className="flex items-center gap-2 text-sm text-ink-2">
           <Loader2 size={14} className="animate-spin" aria-hidden /> Thinking
@@ -42,7 +42,7 @@ function PartView({ part, messageId, caret }: { part: Part; messageId: string; c
   switch (part.kind) {
     case "text":
       return (
-        <div className="prose-fin chat-prose text-sm" aria-live={caret ? "off" : undefined}>
+        <div className="prose-fin chat-prose text-base" aria-live={caret ? "off" : undefined}>
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{

@@ -1,7 +1,7 @@
 "use client";
 
 import clsx from "clsx";
-import { ArrowDownRight, ArrowUpRight, BellRing, CircleCheck, Phone, RotateCw } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, BellRing, CircleCheck, Phone, RotateCw, type LucideIcon } from "lucide-react";
 import type { EvaluationLevel } from "@/lib/api";
 import { direction, signedMoney, signedPct } from "@/lib/format";
 
@@ -20,6 +20,44 @@ export function SectionHeader({
         {title}
       </h2>
       {action}
+    </div>
+  );
+}
+
+/** Small icon-and-label header at the top of a bento tile. */
+export function TileHeader({
+  title,
+  icon: Icon,
+  action,
+  id,
+}: {
+  title: string;
+  icon: LucideIcon;
+  action?: React.ReactNode;
+  id?: string;
+}) {
+  return (
+    <div className="mb-4 flex min-h-[28px] flex-wrap items-center justify-between gap-x-4 gap-y-2">
+      <h2 id={id} className="flex min-w-0 items-center gap-2 text-sm font-medium text-ink-2">
+        <Icon size={15} aria-hidden className="shrink-0" />
+        {title}
+      </h2>
+      {action}
+    </div>
+  );
+}
+
+/** Horizontal share strip: solid segments, with hatching filling whatever they leave empty. */
+export function Strip({ segments, label }: { segments: { value: number; className: string }[]; label: string }) {
+  const total = segments.reduce((sum, s) => sum + s.value, 0);
+  // A fixed quarter stays hatched so the strip keeps its texture when one segment is everything.
+  const scale = 75 / (total || 1);
+  return (
+    <div role="img" aria-label={label} className="flex h-6 gap-0.5 overflow-hidden rounded-[6px] bg-raised">
+      {segments.filter((s) => s.value > 0).map((s, i) => (
+        <span key={i} className={clsx("block h-full", s.className)} style={{ width: `${s.value * scale}%` }} />
+      ))}
+      <span aria-hidden className="hatch block h-full flex-1" />
     </div>
   );
 }
@@ -102,7 +140,7 @@ export function ErrorNote({ error, onRetry, what }: { error: unknown; onRetry?: 
 
 export function EmptyState({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="rounded border border-edge bg-surface px-4 py-6 text-sm text-ink-2">
+    <div className="rounded bg-plane px-4 py-6 text-sm text-ink-2">
       <div className="max-w-prose">{children}</div>
       {action && <div className="mt-3">{action}</div>}
     </div>
@@ -121,7 +159,7 @@ export function Segmented<T extends string>({
   label: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="bg-surface inline-flex rounded-pill border border-edge p-0.5">
+    <div role="radiogroup" aria-label={label} className="inline-flex rounded-pill bg-raised p-0.5">
       {options.map((o) => (
         <button
           key={o.value}
@@ -130,7 +168,7 @@ export function Segmented<T extends string>({
           onClick={() => onChange(o.value)}
           className={clsx(
             "rounded-pill px-2.5 py-1 text-xs transition-colors",
-            value === o.value ? "bg-raised text-ink" : "text-ink-3 hover:text-ink",
+            value === o.value ? "bg-accent-strong text-white" : "text-ink-3 hover:text-ink",
           )}
         >
           {o.label}

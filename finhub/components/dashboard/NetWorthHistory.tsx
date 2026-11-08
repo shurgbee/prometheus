@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { TrendingUp } from "lucide-react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { HistoryRange, NetWorthPoint } from "@/lib/api";
 import { useNetWorthHistory } from "@/lib/hooks";
 import { money, shortDate } from "@/lib/format";
-import { ErrorNote, Segmented, Skeleton, SectionHeader } from "@/components/ui";
+import { ErrorNote, Segmented, Skeleton, TileHeader } from "@/components/ui";
 
 const RANGES: { value: HistoryRange; label: string }[] = [
   { value: "1M", label: "1M" },
@@ -14,9 +15,10 @@ const RANGES: { value: HistoryRange; label: string }[] = [
   { value: "ALL", label: "All" },
 ];
 
-const LINE = "#3987E5";
-const GRID = "#2C2724";
-const MUTED = "#8F8780";
+const LINE = "#F6F4F4";
+const FILL = "#B04A45";
+const GRID = "rgba(255,255,255,0.07)";
+const MUTED = "#A09C9C";
 
 const compactUsd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", notation: "compact", maximumFractionDigits: 1 });
 
@@ -33,26 +35,27 @@ export function NetWorthHistory() {
   const last = points[points.length - 1];
 
   return (
-    <section aria-labelledby="history-title" className="rounded-lg border border-edge bg-surface p-5 sm:p-6">
-      <SectionHeader
+    <section aria-labelledby="history-title" className="tile flex h-full flex-col">
+      <TileHeader
         id="history-title"
         title="Net worth over time"
+        icon={TrendingUp}
         action={<Segmented label="Time range" options={RANGES} value={range} onChange={setRange} />}
       />
       {error && !data ? (
         <ErrorNote error={error} what="net worth history" onRetry={() => mutate()} />
       ) : isLoading && !data ? (
-        <Skeleton className="h-[200px] w-full" />
+        <Skeleton className="h-[240px] w-full" />
       ) : points.length < 2 ? (
         <p className="text-sm text-ink-3">Not enough data yet.</p>
       ) : (
-        <div className="h-[200px] w-full" role="img" aria-label={`Net worth from ${shortDate(first?.ts)} to ${shortDate(last?.ts)}`}>
+        <div className="h-[240px] min-h-0 w-full flex-1" role="img" aria-label={`Net worth from ${shortDate(first?.ts)} to ${shortDate(last?.ts)}`}>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={points} margin={{ top: 8, right: 4, bottom: 0, left: 4 }}>
               <defs>
                 <linearGradient id="nw-fill" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="0%" stopColor={LINE} stopOpacity={0.14} />
-                  <stop offset="100%" stopColor={LINE} stopOpacity={0.02} />
+                  <stop offset="0%" stopColor={FILL} stopOpacity={0.5} />
+                  <stop offset="100%" stopColor={FILL} stopOpacity={0.03} />
                 </linearGradient>
               </defs>
               <CartesianGrid vertical={false} stroke={GRID} strokeWidth={1} />
@@ -75,7 +78,7 @@ export function NetWorthHistory() {
                 tickCount={4}
               />
               <Tooltip
-                cursor={{ stroke: "rgba(237,233,228,0.3)", strokeWidth: 1 }}
+                cursor={{ stroke: "rgba(255,255,255,0.3)", strokeWidth: 1 }}
                 content={<HistoryTooltip />}
                 isAnimationActive={false}
               />
@@ -88,7 +91,7 @@ export function NetWorthHistory() {
                 fill="url(#nw-fill)"
                 baseValue="dataMin"
                 isAnimationActive={false}
-                activeDot={{ r: 4, fill: LINE, stroke: "#14110F", strokeWidth: 2 }}
+                activeDot={{ r: 4, fill: LINE, stroke: "#151516", strokeWidth: 2 }}
                 dot={false}
               />
             </AreaChart>

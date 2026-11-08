@@ -1,37 +1,39 @@
 import type { Config } from "tailwindcss";
 
-// Design tokens. Dark only. Contrast ratios are measured against `plane`/`surface`.
+// Design tokens. Black-and-red bento theme. Contrast ratios are measured against `surface`.
 const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}", "./lib/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        plane: "#121213", // inset boxes inside panels
-        surface: "#1B1816", // panels
-        raised: "#24201D", // inputs, hovered rows, popovers
-        overlay: "#2C2724",
-        line: "rgba(237, 233, 228, 0.08)", // hairlines
-        "line-strong": "rgba(237, 233, 228, 0.16)",
+        canvas: "#09090A", // page behind the tiles
+        plane: "#1C1C1E", // inset boxes inside tiles
+        surface: "#151516", // tiles
+        raised: "#232325", // inputs, hovered rows, popovers
+        overlay: "#2A2A2C",
+        line: "rgba(255, 255, 255, 0.08)", // hairlines
+        "line-strong": "rgba(255, 255, 255, 0.16)",
         ink: {
-          DEFAULT: "#FDFBF8", // 17:1 on surface
-          2: "#F0ECE6", // 15:1 on surface
-          3: "#DAD5CE", // 12:1 on surface, muted labels
+          DEFAULT: "#F6F4F4", // 17:1 on surface
+          2: "#CFCBCB", // 11:1 on surface
+          3: "#A09C9C", // 7:1 on surface, muted labels
         },
         accent: {
-          DEFAULT: "#7FA6F5", // links, focus, primary actions (7.8:1)
-          strong: "#3987E5",
-          ink: "#0E1A33", // text on accent fills
+          DEFAULT: "#DC918A", // links and focus (7:1)
+          strong: "#9E3F3B", // fills behind white text (6:1),
+          ink: "#FFFFFF", // text on accent fills
         },
+        brand: "#B04A45", // red fills and marks
         series: {
-          cash: "#3987E5",
-          cd: "#D95926",
-          stocks: "#199E70",
+          cash: "#F6F4F4",
+          cd: "#A3A3A6",
+          stocks: "#B04A45",
         },
-        up: "#2FB36A",
-        down: "#E66767",
+        up: "#3CCB7F",
+        down: "#E0877F",
         status: {
-          normal: "#FAB219",
-          critical: "#D03B3B",
+          normal: "#F0A92B",
+          critical: "#E07A72",
         },
       },
       fontFamily: {
@@ -53,8 +55,8 @@ const config: Config = {
       },
       borderRadius: {
         sm: "6px",
-        DEFAULT: "10px",
-        lg: "14px",
+        DEFAULT: "12px",
+        lg: "20px",
         pill: "999px",
       },
       keyframes: {

@@ -525,3 +525,21 @@ def test_event_condition_always_names_its_subject():
     assert named["condition"] == "Apple: announces a stock split"
     kept = clean_alert_request({"symbol": "AAPL", "name": "Apple", "condition": "Apple has announced a stock split."})
     assert kept["condition"] == "Apple has announced a stock split."
+
+
+def test_research_failure_explains_a_topic_with_no_tickers(client, app, monkeypatch):
+    def run(topic):
+        job = client.post("/api/research", json={"topic": topic}).json()
+        assert client.portal.call(app.state.research.run_next)
+        return client.get(f"/api/research/{job['id']}").json()
+
+    unclear = run("Battery supply chain outlook")
+    assert unclear["status"] == "failed"
+    assert "Name a company or ticker" in unclear["error"]
+
+    async def service_down(topic):
+        raise RuntimeError("provider unavailable")
+    monkeypatch.setattr(app.state.providers, "context_tickers", service_down)
+    outage = run("Tesla outlook")
+    assert outage["status"] == "failed"
+    assert "check model/market service configuration" in outage["error"]

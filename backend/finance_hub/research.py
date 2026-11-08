@@ -22,6 +22,14 @@ def brief(report):
     return row_dict(report, exclude=("summary_embedding", "body_md"))
 
 
+class NoRelatedTickers(ProviderError):
+    """The topic names nothing research can look up; the user can fix this by rewording it."""
+
+
+NO_TICKERS_ERROR = "Couldn't tell which companies this topic is about. Name a company or ticker in the topic."
+GENERIC_ERROR = "Research failed: check model/market service configuration and retry with a new job."
+
+
 class ResearchService:
     def __init__(self, db, providers):
         self.db, self.providers = db, providers
@@ -52,11 +60,11 @@ class ResearchService:
             await session.commit()
         try:
             await self.generate(job)
-        except Exception:
+        except Exception as error:
             async with self.db.sessions() as session:
                 saved = await session.get(ResearchJob, job.id)
                 saved.status, saved.finished_at = "failed", now()
-                saved.error = "Research failed: check model/market service configuration and retry with a new job."
+                saved.error = NO_TICKERS_ERROR if isinstance(error, NoRelatedTickers) else GENERIC_ERROR
                 emit(session, "research_job", {"job_id": job.id, "status": "failed", "error": saved.error,
                                                 "thread_id": job.thread_id})
                 await session.commit()
@@ -65,7 +73,7 @@ class ResearchService:
     async def generate(self, job):
         tickers = job.tickers or await self.providers.context_tickers(job.topic)
         if not tickers:
-            raise ProviderError("Finnhub MVP research requires related tickers")
+            raise NoRelatedTickers("Finnhub MVP research requires related tickers")
         sources = await self.providers.news(tickers)
         if not sources:
             raise ProviderError("No source material available; report was not generated")
