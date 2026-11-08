@@ -1,10 +1,15 @@
 .env
+.env.voice
 .git
 .venv
 *.db
 *.db-*
 __pycache__
 .pytest_cache
+notifier/node_modules
+notifier/data
+infra/voice/data
+infra/voice/runtime
 
 finhub/node_modules
 finhub/.next

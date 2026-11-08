@@ -8,6 +8,14 @@ from finance_hub.schemas import HoldingInput, SignalSpec, TriggerCreate
 
 
 class SchemaTests(unittest.TestCase):
+    def test_shared_nvidia_endpoint_and_per_model_overrides(self):
+        settings = Settings(_env_file=None, demo_mode=True, api_token="long-development-token",
+                            nvidia_base_url="https://hosted.example/v1/", super_base_url="",
+                            nano_base_url="http://nano.internal:8000/v1/", embed_base_url="")
+        self.assertEqual(settings.super_base_url, "https://hosted.example/v1")
+        self.assertEqual(settings.embed_base_url, "https://hosted.example/v1")
+        self.assertEqual(settings.nano_base_url, "http://nano.internal:8000/v1")
+
     def test_live_mode_requires_credentials_and_postgres(self):
         with self.assertRaises(ValidationError):
             Settings(_env_file=None, api_token="long-development-token", demo_mode=False,

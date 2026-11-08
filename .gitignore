@@ -1,4 +1,7 @@
 .env
+.env.voice
+infra/voice/data/
+infra/voice/runtime/
 .venv/
 __pycache__/
 .pytest_cache/
@@ -10,3 +13,5 @@ __pycache__/
 dist/
 
 .playwright-mcp/
+notifier/node_modules/
+notifier/data/

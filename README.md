@@ -1,6 +1,6 @@
 # Finance Hub backend
 
-FastAPI and a separate durable worker implement Dev A's reduced hackathon MVP in [SPEC.md](SPEC.md). The Next.js frontend in `finhub/` is integrated through a same-origin server proxy. The TypeScript Photon/LiveKit/Riva notifier remains a separate service. No trades are executed.
+FastAPI and a separate durable worker implement Dev A's reduced hackathon MVP in [SPEC.md](SPEC.md). The Next.js frontend in `finhub/` is integrated through a same-origin server proxy. The TypeScript Photon notifier supports iMessage/SMS texts and calls through a self-hosted LiveKit SIP/audio gateway. The Brev deployment uses GPU Kokoro TTS, with an optional Riva profile; see the [deployment runbook](docs/voice-deployment.md). Without a voice gateway, call requests fall back to a CRITICAL text. No trades are executed.
 
 ## Run the integrated app
 
@@ -113,9 +113,9 @@ asset_class,name,ticker,quantity,cost_basis,principal,apy,start_date,maturity_da
 Put secrets in the untracked `.env`, not in chat or source files. Use a separate live database; demo reports use a different embedding space and should not appear in the live index.
 
 1. **Tiger Cloud:** create a Postgres service in the [Tiger console](https://console.cloud.timescale.com/), copy its TLS connection URL into `DATABASE_URL` (`postgresql://...?...sslmode=require`), and allow your app host to connect. The app creates base tables, pgvector and LangGraph checkpoint tables on startup; the DB user needs permission for those. Start the API once, then optionally apply `sql/001_timescale.sql` for hypertables, seven-day quote compression and a daily continuous aggregate. Base queries also work on ordinary Postgres tables. This initial schema uses JSON columns for holding fields and trigger specs; it preserves exact event dedupe in a regular signal table. It uses schema bootstrap, not an incremental production migration framework.
-2. **NVIDIA:** create an account at [build.nvidia.com](https://build.nvidia.com/) and generate an API key with access to your selected [Super model](https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-3-super-120b-a12b), Nano and embedding endpoints. Set `NVIDIA_API_KEY`, or provide separate per-model keys. The default embedding model is the documented 2048-dimension `nvidia/llama-nemotron-embed-vl-1b-v2`; `EMBED_MODEL` and `EMBED_DIMENSIONS` are configurable for the spec's preferred Nemotron 3.5 Embed deployment. Confirm access/model IDs in your account. Hosted availability, limits and billing depend on that account. Only seeded holdings should go to hosted demo models; phone numbers are read solely by the notifier path.
+2. **NVIDIA:** create an account at [build.nvidia.com](https://build.nvidia.com/) and generate an API key with access to your selected [Super model](https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-3-super-120b-a12b), Nano and embedding endpoints. Set `NVIDIA_API_KEY` and `NVIDIA_BASE_URL=https://integrate.api.nvidia.com/v1` once for Super, Nano and embeddings. Optional `SUPER_BASE_URL`, `NANO_BASE_URL`, `EMBED_BASE_URL` and matching per-model keys override these shared defaults; leave them blank for fully hosted operation. The default embedding model is the documented 2048-dimension `nvidia/llama-nemotron-embed-vl-1b-v2`; `EMBED_MODEL` and `EMBED_DIMENSIONS` are configurable for the spec's preferred Nemotron 3.5 Embed deployment. Confirm access/model IDs in your account. Hosted availability, limits and billing depend on that account. Only seeded holdings should go to hosted demo models; phone numbers are read solely by the notifier path.
 3. **Finnhub:** create an account at [finnhub.io](https://finnhub.io/), generate a key, and set `FINNHUB_API_KEY`. Confirm the account permits [quotes and company news](https://finnhub.io/docs/api). Polling is limited to held/watched tickers; provider 429s are retried with bounded backoff.
-4. **Alerts developer:** supply `NOTIFIER_URL` and a strong shared `NOTIFIER_TOKEN`, configure `ALERT_PHONE` in E.164 format, and set `DASHBOARD_URL`. That developer needs a Photon project/line and its credentials, LiveKit SIP (or Retell), and Riva TTS access. Those credentials stay in the notifier; the Python backend does not need them. A critical alert cannot ring a phone until that separate service works.
+4. **Photon texting:** create a project with an iMessage or SMS line at [app.photon.codes](https://app.photon.codes/) and set `PHOTON_PROJECT_ID` (`pho_prj_…`) and `PHOTON_API_KEY` (a project API key, `pho_sk_…`, with users, spaces and messages permissions). Set `NOTIFIER_URL` (default `http://127.0.0.1:8001`), a strong shared `NOTIFIER_TOKEN`, `ALERT_PHONE` (the recipient, not the line's own number), and `DASHBOARD_URL`. Select `PHOTON_PLATFORM=sms` for an SMS line; SMS and calls require E.164 recipients, while iMessage texts can use Apple ID emails. SMS campaign eligibility is separate from voice capability. For critical calls, configure the [self-hosted voice deployment](docs/voice-deployment.md); setup additionally needs Platforms permissions to configure outbound SIP.
 5. Set `DEMO_MODE=false`, use a strong random `API_TOKEN`, and normally disable `ENABLE_DEV_INJECTION`. Keep injection enabled only for your controlled live demo if you explicitly want it to contact the real notifier.
 
 Brev is optional for starting live: all models can use hosted endpoints. To use your L40S, provision it in Brev and run Nano and Embed OpenAI-compatible servers. Set `NANO_BASE_URL`, `NANO_MODEL`, `EMBED_BASE_URL`, `EMBED_MODEL` and any per-server keys to their reachable endpoints. Keep Super hosted and cap Nano context to 32K. GPU provisioning/model serving is infrastructure setup, not an action this repository can perform without your Brev account. See [NVIDIA's model configuration guidance](https://docs.nvidia.com/rag/latest/change-model.html).
@@ -123,6 +123,42 @@ Brev is optional for starting live: all models can use hosted endpoints. To use 
 The backend validates every embedding's size and stores its model ID. If changing the embedding model/dimensions, re-embed existing reports into a fresh database or migrate them deliberately. `sql/002_vectors.sql` optionally builds StreamingDiskANN indexes for a **single-model, 2048-dimension** live database; otherwise exact pgvector distance search is sufficient at demo scale. The script deliberately pins column dimensions. See [pgvector Python](https://github.com/pgvector/pgvector-python) and [pgvectorscale](https://github.com/timescale/pgvectorscale).
 
 No Alpaca, NYT, FRED, Congress.gov, Steel or FT account/key is required for this MVP because those adapters are cut in the spec.
+
+## Photon text alerts
+
+`notifier/` is a small Node service that receives alerts from the worker and texts them to `ALERT_PHONE` from your Photon iMessage line through Photon's REST API (`api.photon.codes`). It reads the same root `.env` as the backend. It needs Node 20.12 or newer.
+
+```sh
+cd notifier
+npm install
+npm run send-test        # texts ALERT_PHONE once to confirm the Photon credentials and line
+npm start                # listens on NOTIFIER_URL's port (8001 by default)
+```
+
+**Shared iMessage lines only text people who have texted the line first.** Before the first alert, send any message to your Photon line from `ALERT_PHONE`. Photon assigns whichever handle iMessage sends from (your phone number or your Apple ID email), and `ALERT_PHONE` must match it. `npm run photon-doctor` shows your line, assignments and conversations. Otherwise sends fail with `SHARED_LINE_INBOUND_REQUIRED`. Dedicated lines don't have this limit. If the project has several lines, set `PHOTON_LINE` to the one to send from.
+
+`scripts/dev.py` starts the notifier automatically in live mode (`DEMO_MODE=false`) when `NOTIFIER_URL` points at `127.0.0.1` or `localhost`; pass `--no-notifier` to run it yourself. Set `PHOTON_DRY_RUN=true` to log texts instead of sending them.
+
+Texts look like:
+
+```text
+[NORMAL] Tesla – leadership & legal (58)
+A short evidence-grounded summary
+http://localhost:3000/?alert=uuid
+```
+
+Behaviour:
+
+- Accepted alerts are written to `notifier/data/deliveries.json` before the notifier replies, so a retried `/notify` with the same alert ID is never texted twice, even across restarts. Unfinished sends resume on startup.
+- Photon sends are tried three times. The outcome is reported back to the backend as `sent`, `failed`, or `text_fallback` (a requested call that was sent as a text).
+- Photon errors that a retry can't fix (bad key, line not texted first) fail immediately with an explanation in the notifier log.
+- `GET /healthz` reports the mode: `photon_api`, `spectrum` (if you set `SPECTRUM_PROJECT_ID`/`SPECTRUM_PROJECT_SECRET` instead of the Photon key) or `dry_run`.
+- Optional voice delivery: set `VOICE_GATEWAY_URL` to the authenticated gateway. It renders a WAV, calls through LiveKit/Photon, sends details, and persists one missed-call retry after two minutes. Dashboard ack/snooze state is checked before retries through `GET /api/internal/alerts/{alert_id}/state` using `NOTIFIER_TOKEN`. See [voice deployment](docs/voice-deployment.md).
+- Not built yet: delivered/read receipts and inbound replies (ack, mute) through Photon webhooks; DTMF acknowledgement is also deferred.
+
+The dashboard link only opens on the phone if `DASHBOARD_URL` is reachable from it.
+
+Run the notifier tests with `npm test` and `npm run typecheck` inside `notifier/`.
 
 ## Notifier handoff
 
@@ -135,6 +171,7 @@ The worker POSTs `NOTIFIER_URL/notify` with `Authorization: Bearer NOTIFIER_TOKE
   "phone": "+15555550123",
   "title": "Tesla – leadership and legal",
   "summary": "A short evidence-grounded summary",
+  "severity": 82,
   "url": "https://dashboard.example/?alert=uuid",
   "channel": "call"
 }

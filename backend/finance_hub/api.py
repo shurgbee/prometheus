@@ -387,6 +387,15 @@ def create_app(settings: Settings | None = None):
             await session.commit()
             return await load_alert_view(session, item, settings.demo_mode)
 
+    @app.get("/api/internal/alerts/{alert_id}/state", dependencies=[Depends(require_notifier)])
+    async def notifier_alert_state(alert_id: str):
+        async with db.sessions() as session:
+            item = await get_row(session, Alert, alert_id)
+            trigger = await session.get(Trigger, item.trigger_id)
+            return {"acked_at": item.acked_at,
+                    "snoozed_until": aware(item.snoozed_until) if item.snoozed_until else None,
+                    "trigger_status": trigger.status if trigger else "deleted"}
+
     @app.patch("/api/internal/alerts/{alert_id}/delivery", dependencies=[Depends(require_notifier)])
     async def delivery_callback(alert_id: str, data: DeliveryUpdate):
         async with db.sessions() as session:

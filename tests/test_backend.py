@@ -88,6 +88,22 @@ def inject(client, trigger_id, external_id="event-1", **patch):
         "magnitude": 1, "urgency": 1, **patch})
 
 
+def test_notifier_retry_state_uses_notifier_auth_and_exposes_ack_and_snooze(client):
+    seed_holdings(client)
+    trigger = create_watch(client)
+    result = inject(client, trigger).json()
+    alert_id = result["alert"]["id"]
+    path = f"/api/internal/alerts/{alert_id}/state"
+    assert client.get(path).status_code == 401
+    headers = {"Authorization": "Bearer notifier-test-token"}
+    state = client.get(path, headers=headers).json()
+    assert state == {"acked_at": None, "snoozed_until": None, "trigger_status": "active"}
+    assert client.post(f"/api/alerts/{alert_id}/snooze?duration=1h").status_code == 200
+    assert client.get(path, headers=headers).json()["snoozed_until"]
+    client.post(f"/api/alerts/{alert_id}/ack")
+    assert client.get(path, headers=headers).json()["acked_at"]
+
+
 def test_injection_gates_dedupe_cooldown_ack_and_callback(client, app):
     seed_holdings(client)
     trigger = create_watch(client)
