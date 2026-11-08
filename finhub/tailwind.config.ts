@@ -6,16 +6,16 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        plane: "#14110F", // page background, warm near-black
+        plane: "#121213", // inset boxes inside panels
         surface: "#1B1816", // panels
         raised: "#24201D", // inputs, hovered rows, popovers
         overlay: "#2C2724",
         line: "rgba(237, 233, 228, 0.08)", // hairlines
         "line-strong": "rgba(237, 233, 228, 0.16)",
         ink: {
-          DEFAULT: "#EDE9E4", // 15.6:1 on plane
-          2: "#B6AEA6", // 8.6:1
-          3: "#8F8780", // 5.3:1, muted labels
+          DEFAULT: "#FDFBF8", // 17:1 on surface
+          2: "#F0ECE6", // 15:1 on surface
+          3: "#DAD5CE", // 12:1 on surface, muted labels
         },
         accent: {
           DEFAULT: "#7FA6F5", // links, focus, primary actions (7.8:1)

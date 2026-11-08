@@ -22,6 +22,24 @@ export interface Message {
   stopped?: boolean;
 }
 
+interface Conversation {
+  id: string;
+  threadId: string | null;
+  title: string;
+  updatedAt: number;
+  messages: Message[];
+  streaming: boolean;
+  retryable: boolean;
+}
+
+export interface ConversationSummary {
+  id: string;
+  title: string;
+  updatedAt: number;
+  streaming: boolean;
+  needsDecision: boolean;
+}
+
 interface ChatState {
   threadId: string | null;
   messages: Message[];
@@ -34,13 +52,27 @@ interface ChatState {
   send: (text: string) => void;
   decide: (messageId: string, decisions: ProposalDecision[]) => void;
   stop: () => void;
-  reset: () => void;
+  /** Conversations with at least one message, newest first. */
+  conversations: ConversationSummary[];
+  activeId: string;
+  newConversation: () => void;
+  selectConversation: (id: string) => void;
+  deleteConversation: (id: string) => void;
 }
 
 const ChatContext = createContext<ChatState | null>(null);
-const STORAGE_KEY = "finhub.chat.v1";
+const STORAGE_KEY = "finhub.chat.v2";
+const LEGACY_STORAGE_KEY = "finhub.chat.v1";
+const MAX_SAVED = 50;
+const INITIAL_ID = "c-initial";
 let seq = 0;
 const mid = () => `m${Date.now().toString(36)}${(seq++).toString(36)}`;
+
+const blank = (id: string = mid()): Conversation =>
+  ({ id, threadId: null, title: "", updatedAt: 0, messages: [], streaming: false, retryable: false });
+
+const hasPendingDecision = (messages: Message[]) =>
+  messages.some((m) => m.parts.some((p) => p.kind === "proposals" && !p.decided));
 
 function applyEvent(parts: Part[], ev: ChatEvent): Part[] {
   const next = [...parts];
@@ -50,6 +82,17 @@ function applyEvent(parts: Part[], ev: ChatEvent): Part[] {
       if (!ev.text) return parts;
       if (last?.kind === "text") next[next.length - 1] = { kind: "text", text: last.text + ev.text };
       else next.push({ kind: "text", text: ev.text });
+      return next;
+    }
+    case "answer": {
+      if (!ev.text) return parts;
+      for (let i = next.length - 1; i >= 0; i--) {
+        if (next[i].kind === "text") {
+          next[i] = { kind: "text", text: ev.text };
+          return next;
+        }
+      }
+      next.push({ kind: "text", text: ev.text });
       return next;
     }
     case "tool": {
@@ -94,26 +137,62 @@ function errorText(e: unknown): string {
   return `Couldn't get a reply: ${msg}.`;
 }
 
+function readSaved(): { activeId: string | null; conversations: Conversation[] } {
+  const raw = window.localStorage.getItem(STORAGE_KEY);
+  if (raw) {
+    const saved = JSON.parse(raw) as { activeId: string | null; conversations: Conversation[] };
+    return { activeId: saved.activeId, conversations: saved.conversations.map((c) => ({ ...c, streaming: false })) };
+  }
+  // Carry the single conversation from the previous storage format over.
+  const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY);
+  if (!legacy) return { activeId: null, conversations: [] };
+  const old = JSON.parse(legacy) as { threadId: string | null; messages: Message[] };
+  if (!old.threadId || !old.messages?.length) return { activeId: null, conversations: [] };
+  const first = old.messages.find((m) => m.role === "user")?.parts.find((p) => p.kind === "text");
+  const migrated: Conversation = { ...blank(), threadId: old.threadId, messages: old.messages,
+    title: first?.kind === "text" ? first.text : "Conversation", updatedAt: Date.now() };
+  return { activeId: migrated.id, conversations: [migrated] };
+}
+
 export function ChatProvider({ children }: { children: React.ReactNode }) {
-  const [threadId, setThreadId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [streaming, setStreaming] = useState(false);
+  const [conversations, setConversations] = useState<Conversation[]>([blank(INITIAL_ID)]);
+  const [activeId, setActiveId] = useState(INITIAL_ID);
   const [recovering, setRecovering] = useState(!USE_MOCKS);
-  const [retryable, setRetryable] = useState(false);
-  const threadRef = useRef<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const threadIds = useRef(new Map<string, string | null>());
+  const controllers = useRef(new Map<string, AbortController>());
+  /** Conversations loaded from storage that have not been reconciled with the server yet. */
+  const unsynced = useRef(new Set<string>());
   const loaded = useRef(false);
+  const latest = useRef({ conversations, activeId });
+  latest.current = { conversations, activeId };
+
+  const patch = useCallback((id: string, fn: (c: Conversation) => Conversation) => {
+    setConversations((all) => all.map((c) => (c.id === id ? fn(c) : c)));
+  }, []);
+
+  const remove = useCallback((id: string) => {
+    controllers.current.get(id)?.abort();
+    controllers.current.delete(id);
+    threadIds.current.delete(id);
+    unsynced.current.delete(id);
+    const replacement = latest.current.activeId === id ? blank() : null;
+    setConversations((all) => [...all.filter((c) => c.id !== id), ...(replacement ? [replacement] : [])]);
+    if (replacement) setActiveId(replacement.id);
+  }, []);
 
   // Reconcile local UI state with the durable graph after reload, disconnect or failed resume.
-  const synchronize = useCallback(async (id: string, restoring = false) => {
-    if (!api.getChatState) return;
-    const state = await api.getChatState(id);
-    if (threadRef.current !== id) return;
-    setRetryable(state.retryable);
-    setMessages((current) => {
-      let next: Message[] = restoring ? state.history.map((m) => ({
+  const synchronize = useCallback(async (conversationId: string, restoring = false) => {
+    const threadId = threadIds.current.get(conversationId);
+    if (!api.getChatState || !threadId) return;
+    const state = await api.getChatState(threadId);
+    if (threadIds.current.get(conversationId) !== threadId) return;
+    patch(conversationId, (conversation) => {
+      const textCount = conversation.messages.filter((m) => m.parts.some((p) => p.kind === "text")).length;
+      // Saved messages keep sources and cards, so rebuild from the server only if they fell behind.
+      const rebuild = restoring && textCount !== state.history.length;
+      let next: Message[] = rebuild ? state.history.map((m) => ({
         id: mid(), role: m.role, parts: [{ kind: "text", text: m.content }],
-      })) : current.map((m) => ({ ...m, parts: m.parts.map((p) =>
+      })) : conversation.messages.map((m) => ({ ...m, parts: m.parts.map((p) =>
         p.kind === "proposals" ? { ...p, decided: true } : p) }));
       if (state.awaiting_approval && state.proposals.length) {
         const pending: Part = { kind: "proposals", proposals: state.proposals, decided: false };
@@ -123,177 +202,186 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
           parts: m.parts.map((p) => p.kind === "proposals" ? pending : p) } : m);
         else next.push({ id: mid(), role: "assistant", parts: [pending] });
       }
-      if (restoring && state.research_job) {
+      if (rebuild && state.research_job) {
         next.push({ id: mid(), role: "assistant", parts: [{ kind: "research",
           job_id: state.research_job.id, topic: state.research_job.topic }] });
       }
-      return next;
+      return { ...conversation, messages: next, retryable: state.retryable };
     });
-  }, []);
+  }, [patch]);
+
+  const syncSaved = useCallback(async (id: string) => {
+    if (!unsynced.current.delete(id)) return;
+    try {
+      await synchronize(id, true);
+    } catch (error) {
+      // The server no longer knows this thread, so it can't be continued.
+      if ((error as { status?: number }).status === 404) remove(id);
+    }
+  }, [synchronize, remove]);
 
   useEffect(() => {
     let cancelled = false;
     async function restore() {
       try {
-        if (!USE_MOCKS) {
-          const raw = window.localStorage.getItem(STORAGE_KEY);
-          if (raw) {
-            const saved = JSON.parse(raw) as { threadId: string | null; messages: Message[] };
-            threadRef.current = saved.threadId;
-            setThreadId(saved.threadId);
-            setMessages(saved.messages ?? []);
-            if (saved.threadId) await synchronize(saved.threadId, true);
-          }
+        if (USE_MOCKS) return;
+        const saved = readSaved();
+        if (!saved.conversations.length) return;
+        for (const c of saved.conversations) {
+          threadIds.current.set(c.id, c.threadId);
+          unsynced.current.add(c.id);
         }
-      } catch (error) {
-        if ((error as { status?: number }).status === 404) {
-          threadRef.current = null; setThreadId(null); setMessages([]);
-        }
+        const activeSaved = saved.conversations.some((c) => c.id === saved.activeId) ? saved.activeId! : saved.conversations[0].id;
+        latest.current = { conversations: saved.conversations, activeId: activeSaved };
+        setConversations(saved.conversations);
+        setActiveId(activeSaved);
+        await syncSaved(activeSaved);
+      } catch {
+        /* Storage is optional, and a bad entry shouldn't block the chat. */
       } finally {
         if (!cancelled) { loaded.current = true; setRecovering(false); }
       }
     }
     void restore();
     return () => { cancelled = true; };
-  }, [synchronize]);
+  }, [syncSaved]);
 
+  // Tokens arrive quickly, so writes are debounced.
   useEffect(() => {
-    if (USE_MOCKS || !loaded.current || streaming || recovering) return;
-    try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ threadId, messages })); }
-    catch { /* Storage is optional. */ }
-  }, [threadId, messages, streaming, recovering]);
+    if (USE_MOCKS || !loaded.current || recovering) return;
+    const timer = window.setTimeout(() => {
+      try {
+        const kept = conversations.filter((c) => c.messages.length && c.threadId)
+          .sort((a, b) => b.updatedAt - a.updatedAt).slice(0, MAX_SAVED);
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ activeId, conversations: kept }));
+      } catch { /* Storage is optional. */ }
+    }, 400);
+    return () => window.clearTimeout(timer);
+  }, [conversations, activeId, recovering]);
 
-  const updateMessage = useCallback((id: string, fn: (m: Message) => Message) => {
-    setMessages((ms) => ms.map((m) => (m.id === id ? fn(m) : m)));
-  }, []);
+  const updateMessage = useCallback((conversationId: string, id: string, fn: (m: Message) => Message) => {
+    patch(conversationId, (c) => ({ ...c, messages: c.messages.map((m) => (m.id === id ? fn(m) : m)) }));
+  }, [patch]);
 
   const consume = useCallback(
-    async (stream: () => AsyncIterable<ChatEvent>, assistantId: string, controller: AbortController, onFail?: () => void) => {
-      setStreaming(true);
+    async (conversationId: string, stream: () => AsyncIterable<ChatEvent>, assistantId: string, controller: AbortController, onFail?: () => void) => {
+      patch(conversationId, (c) => ({ ...c, streaming: true }));
       let failed = false;
       let completed = false;
       try {
         for await (const ev of stream()) {
           if (controller.signal.aborted) break;
           if (ev.type === "thread") {
-            threadRef.current = ev.thread_id;
-            setThreadId(ev.thread_id);
-            if (!USE_MOCKS) {
-              try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ threadId: ev.thread_id, messages: [] })); }
-              catch { /* The server checkpoint remains authoritative. */ }
-            }
+            threadIds.current.set(conversationId, ev.thread_id);
+            patch(conversationId, (c) => ({ ...c, threadId: ev.thread_id }));
             continue;
           }
           if (ev.type === "done") { completed = true; break; }
           if (ev.type === "error") { failed = true; onFail?.(); }
           if (ev.type === "triggers_created") void refresh("triggers");
-          updateMessage(assistantId, (m) => ({ ...m, parts: applyEvent(m.parts, ev) }));
+          updateMessage(conversationId, assistantId, (m) => ({ ...m, parts: applyEvent(m.parts, ev) }));
         }
         if (!completed && !failed && !controller.signal.aborted) throw new Error("The connection closed before the turn finished");
-        if (controller.signal.aborted) updateMessage(assistantId, (m) => ({ ...m, stopped: true }));
+        if (controller.signal.aborted) updateMessage(conversationId, assistantId, (m) => ({ ...m, stopped: true }));
       } catch (e) {
         failed = true;
         if ((e as { name?: string })?.name === "AbortError" || controller.signal.aborted) {
-          updateMessage(assistantId, (m) => ({ ...m, stopped: true }));
+          updateMessage(conversationId, assistantId, (m) => ({ ...m, stopped: true }));
         } else {
-          updateMessage(assistantId, (m) => ({ ...m, parts: [...m.parts, { kind: "error", message: errorText(e) }] }));
+          updateMessage(conversationId, assistantId, (m) => ({ ...m, parts: [...m.parts, { kind: "error", message: errorText(e) }] }));
           onFail?.();
         }
       } finally {
-        if (abortRef.current === controller) {
-          const id = threadRef.current;
-          if ((failed || controller.signal.aborted) && id) {
-            try { await synchronize(id); } catch { /* Preserve recoverable cards while offline. */ }
+        if (controllers.current.get(conversationId) === controller) {
+          if (failed || controller.signal.aborted) {
+            try { await synchronize(conversationId); } catch { /* Preserve recoverable cards while offline. */ }
           }
-          abortRef.current = null;
-          setStreaming(false);
+          controllers.current.delete(conversationId);
+          patch(conversationId, (c) => ({ ...c, streaming: false }));
         }
       }
     },
-    [updateMessage, synchronize],
+    [patch, updateMessage, synchronize],
   );
 
   const send = useCallback(
     (text: string) => {
       const message = text.trim();
-      if (!message || abortRef.current || recovering || retryable) return;
+      const { activeId: id, conversations: all } = latest.current;
+      if (!message || controllers.current.has(id) || recovering || all.find((c) => c.id === id)?.retryable) return;
       const user: Message = { id: mid(), role: "user", parts: [{ kind: "text", text: message }] };
       const assistant: Message = { id: mid(), role: "assistant", parts: [] };
-      setMessages((ms) => [...ms, user, assistant]);
+      patch(id, (c) => ({ ...c, title: c.title || message, updatedAt: Date.now(), messages: [...c.messages, user, assistant] }));
       const controller = new AbortController();
-      abortRef.current = controller;
-      void consume(() => api.streamChat({ thread_id: threadRef.current, message }, controller.signal), assistant.id, controller);
+      controllers.current.set(id, controller);
+      void consume(id, () => api.streamChat({ thread_id: threadIds.current.get(id) ?? null, message }, controller.signal), assistant.id, controller);
     },
-    [consume, recovering, retryable],
+    [consume, patch, recovering],
   );
 
   const decide = useCallback(
     (messageId: string, decisions: ProposalDecision[]) => {
-      const tid = threadRef.current;
-      if (!tid || abortRef.current) return;
-      setMessages((ms) =>
-        ms.map((m) =>
-          m.id === messageId
-            ? { ...m, parts: m.parts.map((p) => (p.kind === "proposals" ? { ...p, decided: true } : p)) }
-            : m,
-        ),
-      );
+      const id = latest.current.activeId;
+      const threadId = threadIds.current.get(id);
+      if (!threadId || controllers.current.has(id)) return;
+      const setDecided = (decided: boolean) => (c: Conversation) => ({ ...c, messages: c.messages.map((m) =>
+        m.id === messageId ? { ...m, parts: m.parts.map((p) => (p.kind === "proposals" ? { ...p, decided } : p)) } : m) });
       const assistant: Message = { id: mid(), role: "assistant", parts: [] };
-      setMessages((ms) => [...ms, assistant]);
+      patch(id, (c) => ({ ...setDecided(true)(c), updatedAt: Date.now(), messages: [...setDecided(true)(c).messages, assistant] }));
       const controller = new AbortController();
-      abortRef.current = controller;
+      controllers.current.set(id, controller);
       // If the resume request fails, reopen the cards so the user can decide again.
-      const reopen = () =>
-        setMessages((ms) =>
-          ms.map((m) =>
-            m.id === messageId
-              ? { ...m, parts: m.parts.map((p) => (p.kind === "proposals" ? { ...p, decided: false } : p)) }
-              : m,
-          ),
-        );
-      void consume(() => api.resumeChat(tid, { decisions }, controller.signal), assistant.id, controller, reopen);
+      const reopen = () => patch(id, setDecided(false));
+      void consume(id, () => api.resumeChat(threadId, { decisions }, controller.signal), assistant.id, controller, reopen);
     },
-    [consume],
+    [consume, patch],
   );
 
   const retry = useCallback(() => {
-    const id = threadRef.current;
-    if (!id || abortRef.current || !api.retryChat) return;
+    const id = latest.current.activeId;
+    const threadId = threadIds.current.get(id);
+    if (!threadId || controllers.current.has(id) || !api.retryChat) return;
     const assistant: Message = { id: mid(), role: "assistant", parts: [] };
-    setMessages((ms) => [...ms, assistant]);
-    const controller = new AbortController(); abortRef.current = controller;
-    setRetryable(false);
-    void consume(() => api.retryChat!(id, controller.signal), assistant.id, controller);
-  }, [consume]);
+    patch(id, (c) => ({ ...c, retryable: false, messages: [...c.messages, assistant] }));
+    const controller = new AbortController();
+    controllers.current.set(id, controller);
+    void consume(id, () => api.retryChat!(threadId, controller.signal), assistant.id, controller);
+  }, [consume, patch]);
 
   const stop = useCallback(() => {
-    abortRef.current?.abort();
+    controllers.current.get(latest.current.activeId)?.abort();
   }, []);
 
-  const reset = useCallback(() => {
-    abortRef.current?.abort();
-    abortRef.current = null;
-    threadRef.current = null;
-    setThreadId(null);
-    setMessages([]);
-    setStreaming(false);
-    setRetryable(false);
-    try {
-      window.localStorage.removeItem(STORAGE_KEY);
-    } catch {
-      /* ignore */
-    }
+  const newConversation = useCallback(() => {
+    const { conversations: all } = latest.current;
+    const empty = all.find((c) => !c.messages.length);
+    if (empty) { setActiveId(empty.id); return; }
+    const fresh = blank();
+    setConversations((current) => [...current, fresh]);
+    setActiveId(fresh.id);
   }, []);
 
-  const awaitingDecision = useMemo(
-    () => messages.some((m) => m.parts.some((p) => p.kind === "proposals" && !p.decided)),
-    [messages],
+  const selectConversation = useCallback((id: string) => {
+    setActiveId(id);
+    void syncSaved(id);
+  }, [syncSaved]);
+
+  const active = conversations.find((c) => c.id === activeId) ?? blank(activeId);
+  const awaitingDecision = hasPendingDecision(active.messages);
+
+  const summaries = useMemo<ConversationSummary[]>(
+    () => conversations.filter((c) => c.messages.length)
+      .map((c) => ({ id: c.id, title: c.title || "Conversation", updatedAt: c.updatedAt, streaming: c.streaming,
+                     needsDecision: hasPendingDecision(c.messages) }))
+      .sort((a, b) => b.updatedAt - a.updatedAt),
+    [conversations],
   );
 
-  const value = useMemo(
-    () => ({ threadId, messages, streaming, recovering, retryable, retry, awaitingDecision, send, decide, stop, reset }),
-    [threadId, messages, streaming, recovering, retryable, retry, awaitingDecision, send, decide, stop, reset],
-  );
+  const value: ChatState = {
+    threadId: active.threadId, messages: active.messages, streaming: active.streaming, recovering,
+    retryable: active.retryable, retry, awaitingDecision, send, decide, stop,
+    conversations: summaries, activeId, newConversation, selectConversation, deleteConversation: remove,
+  };
 
   return <ChatContext.Provider value={value}>{children}</ChatContext.Provider>;
 }

@@ -29,7 +29,7 @@ export function TopBar({ onOpenChat, onOpenDemo }: { onOpenChat: () => void; onO
   const open = portfolio?.market_open ?? (now ? isMarketOpen(now) : false);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-plane/85 backdrop-blur sm:h-[57px]">
+    <header className="sticky top-0 z-30 border-b border-edge bg-surface sm:h-[57px]">
       <div className="flex flex-wrap items-center gap-x-3 px-4 sm:h-14 sm:flex-nowrap sm:gap-6 sm:px-8">
         <Link href="/" className="flex h-14 items-center font-dot text-xl font-black tracking-wide text-ink sm:h-auto" aria-label="Prometheus home">
           prometheus
@@ -57,7 +57,7 @@ export function TopBar({ onOpenChat, onOpenDemo }: { onOpenChat: () => void; onO
         <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
           {(USE_MOCKS || portfolio?.demo) && (
             <span
-              className="rounded-pill border border-dashed border-line-strong px-2 py-0.5 text-2xs text-ink-3"
+              className="rounded-pill border border-line-strong px-2 py-0.5 text-2xs text-ink-3"
               title="Prices and delivery are simulated; no real phone messages are sent."
             >
               Demo data

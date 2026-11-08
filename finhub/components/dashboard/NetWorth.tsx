@@ -34,9 +34,9 @@ export function NetWorth() {
   if (error && !data) return <ErrorNote error={error} what="your portfolio" onRetry={() => mutate()} />;
 
   return (
-    <section aria-labelledby="networth-title" className="grid gap-8 md:grid-cols-[minmax(0,1fr)_minmax(0,360px)] md:items-center">
+    <section aria-labelledby="networth-title" className="grid gap-8 rounded-lg border border-edge bg-surface p-5 sm:p-6 md:grid-cols-[minmax(0,1fr)_minmax(0,360px)] md:items-center">
       <div className="min-w-0">
-        <h1 id="networth-title" className="text-sm text-ink-3">
+        <h1 id="networth-title" className="section-title">
           Net worth
         </h1>
         {isLoading || !data ? (
@@ -65,7 +65,7 @@ export function NetWorth() {
 
 function Hero({ value }: { value: number }) {
   return (
-    <p className="mt-1 text-[44px] font-bold leading-[1.05] tracking-[-0.015em] text-ink sm:text-hero" aria-label={money(value, { cents: true })}>
+    <p className="mt-2 text-[44px] font-bold leading-[1.05] tracking-[-0.015em] text-ink sm:text-hero" aria-label={money(value, { cents: true })}>
       <CountUp
         to={value}
         mode="roll"

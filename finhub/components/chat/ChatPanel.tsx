@@ -2,8 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import clsx from "clsx";
-import { ArrowUp, RotateCcw, Square, X } from "lucide-react";
-import { useChat } from "./ChatContext";
+import { ArrowUp, History, Loader2, Plus, Square, Trash2, X } from "lucide-react";
+import { useChat, type ConversationSummary } from "./ChatContext";
 import { MessageView } from "./MessageView";
 
 const SUGGESTIONS = [
@@ -12,9 +12,55 @@ const SUGGESTIONS = [
   { text: "Write a report on EV subsidies", tone: "border-[#D95926]/55 text-[#F0A27E]" },
 ];
 
+function ago(timestamp: number): string {
+  const minutes = Math.floor((Date.now() - timestamp) / 60000);
+  if (minutes < 1) return "Just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
+  return new Date(timestamp).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function ConversationList({ items, activeId, onSelect, onDelete }: {
+  items: ConversationSummary[];
+  activeId: string;
+  onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  if (!items.length) return <p className="text-sm text-ink-2">No conversations yet.</p>;
+  return (
+    <ul className="space-y-1" aria-label="Conversations">
+      {items.map((c) => (
+        <li key={c.id} className={clsx("group flex items-center rounded-lg hover:bg-raised", c.id === activeId && "bg-raised")}>
+          <button className="min-w-0 flex-1 px-3 py-2.5 text-left" onClick={() => onSelect(c.id)} aria-current={c.id === activeId || undefined}>
+            <span className="block truncate text-sm text-ink">{c.title}</span>
+            <span className="mt-0.5 flex items-center gap-1.5 text-xs text-ink-2">
+              {c.streaming ? (
+                <><Loader2 size={11} className="animate-spin" aria-hidden /> Answering</>
+              ) : c.needsDecision ? (
+                <span className="text-accent">Needs your decision</span>
+              ) : (
+                ago(c.updatedAt)
+              )}
+            </span>
+          </button>
+          <button
+            className="mr-1.5 shrink-0 rounded p-2 text-ink-2 hover:text-down focus:opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
+            onClick={() => onDelete(c.id)}
+            aria-label={`Delete conversation: ${c.title}`}
+          >
+            <Trash2 size={14} aria-hidden />
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function ChatPanel({ onClose }: { onClose: () => void }) {
-  const { messages, streaming, recovering, retryable, retry, awaitingDecision, send, stop, reset } = useChat();
+  const { messages, streaming, recovering, retryable, retry, awaitingDecision, send, stop, conversations, activeId,
+          newConversation, selectConversation, deleteConversation } = useChat();
   const [draft, setDraft] = useState("");
+  const [showHistory, setShowHistory] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const stick = useRef(true);
@@ -23,7 +69,13 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     const el = scroller.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
-  }, [messages]);
+  }, [messages, showHistory]);
+
+  // Each conversation opens at its newest message.
+  useEffect(() => {
+    stick.current = true;
+    setDraft("");
+  }, [activeId]);
 
   // Grow the composer with its content, up to a limit.
   useEffect(() => {
@@ -40,21 +92,37 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
     stick.current = true;
     send(text);
     setDraft("");
+    setShowHistory(false);
   }
 
   return (
-    <div className="flex h-full flex-col border-l border-line bg-surface">
+    <div className="flex h-full flex-col border-l border-edge bg-surface">
       <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-line px-5">
         <div>
           <h2 className="font-display font-semibold text-xl leading-none text-ink">Advisor</h2>
         </div>
         <div className="flex items-center gap-1">
-          {messages.length > 0 && (
-            <button className="btn-quiet" onClick={reset} title="Start a new conversation">
-              <RotateCcw size={14} aria-hidden />
-              New
-            </button>
-          )}
+          <button
+            className={clsx("btn-quiet", showHistory && "bg-raised text-ink")}
+            onClick={() => setShowHistory((open) => !open)}
+            aria-expanded={showHistory}
+            title="Show your conversations"
+          >
+            <History size={14} aria-hidden />
+            History
+          </button>
+          <button
+            className="btn-quiet"
+            onClick={() => {
+              newConversation();
+              setShowHistory(false);
+              input.current?.focus();
+            }}
+            title="Start a new conversation"
+          >
+            <Plus size={14} aria-hidden />
+            New
+          </button>
           <button className="btn-quiet xl:hidden" onClick={onClose} aria-label="Close advisor chat">
             <X size={16} aria-hidden />
           </button>
@@ -69,15 +137,22 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
           stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
         }}
       >
-        {messages.length === 0 ? (
+        {showHistory ? (
+          <ConversationList
+            items={conversations}
+            activeId={activeId}
+            onSelect={(id) => {
+              selectConversation(id);
+              setShowHistory(false);
+            }}
+            onDelete={deleteConversation}
+          />
+        ) : messages.length === 0 ? (
           <div className="flex h-full flex-col justify-end pb-2">
             <p className="font-display font-semibold text-[28px] leading-[1.15] text-ink">
               Noticed something?
               <br />
-              <span className="text-ink-3">Let&apos;s find out what it means for your money.</span>
-            </p>
-            <p className="mt-3 text-sm text-ink-2">
-              I can explain a trend, check your portfolio, set up triggers that watch the news for you, or write a research report.
+              <span className="text-ink-2">Let&apos;s find out what it means for your money.</span>
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
               {SUGGESTIONS.map((s) => (
@@ -107,11 +182,12 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
           submit(draft);
         }}
       >
-        {recovering && <p className="mb-2 text-xs text-ink-2">Restoring your conversation…</p>}
+        {recovering && <p className="mb-2 text-xs text-ink">Restoring your conversation…</p>}
         {retryable && !streaming && <button type="button" className="btn-ghost mb-2" onClick={retry}>Retry interrupted turn</button>}
         {awaitingDecision && !streaming && (
-          <p className="mb-2 text-xs text-ink-2">Approve or reject the suggested triggers above to keep going.</p>
+          <p className="mb-2 text-xs text-ink">Approve or reject the suggested triggers above to keep going.</p>
         )}
+        <p className="mb-2 text-center text-2xs text-ink-2">Not financial advice.</p>
         <div className="flex items-end gap-2 rounded-lg border border-line-strong bg-raised px-3 py-2 focus-within:border-accent">
           <label htmlFor="chat-input" className="sr-only">
             Message the advisor
@@ -130,7 +206,7 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
             }}
             placeholder={awaitingDecision ? "Waiting for your decision on the triggers" : "Ask about a trend, a stock, or your money"}
             disabled={awaitingDecision && !streaming}
-            className="max-h-40 min-h-[24px] flex-1 resize-none bg-transparent text-sm text-ink placeholder:text-ink-3 focus:outline-none disabled:opacity-60"
+            className="max-h-40 min-h-[24px] flex-1 resize-none bg-transparent text-sm text-ink placeholder:text-ink-2 focus:outline-none disabled:opacity-60"
           />
           {streaming ? (
             <button type="button" onClick={stop} className="btn-ghost h-8 w-8 shrink-0 p-0" aria-label="Stop the response">
@@ -147,7 +223,6 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
             </button>
           )}
         </div>
-        <p className="mt-2 text-2xs text-ink-3">Educational, not financial advice. The advisor never places trades.</p>
       </form>
     </div>
   );

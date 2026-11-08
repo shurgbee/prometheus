@@ -107,7 +107,7 @@ export function DemoDrawer({ open, onClose }: { open: boolean; onClose: () => vo
         aria-modal="true"
         aria-labelledby="demo-title"
         className={clsx(
-          "fixed inset-y-0 left-0 z-50 flex w-full flex-col border-r border-line bg-surface transition-[transform,visibility] duration-300 sm:w-[420px]",
+          "fixed inset-y-0 left-0 z-50 flex w-full flex-col border-r border-edge bg-surface transition-[transform,visibility] duration-300 sm:w-[420px]",
           open ? "visible translate-x-0" : "invisible -translate-x-full",
         )}
       >
@@ -126,7 +126,7 @@ export function DemoDrawer({ open, onClose }: { open: boolean; onClose: () => vo
           </p>
 
           {!triggers?.length ? (
-            <p className="rounded border border-dashed border-line-strong px-3 py-3 text-sm text-ink-2">
+            <p className="rounded border border-line-strong px-3 py-3 text-sm text-ink-2">
               There are no triggers yet. Approve some in the advisor chat first.
             </p>
           ) : (
@@ -233,13 +233,13 @@ export function DemoDrawer({ open, onClose }: { open: boolean; onClose: () => vo
           )}
 
           {error && (
-            <p role="alert" className="rounded border border-dashed border-down/50 px-3 py-2 text-sm text-ink-2">
+            <p role="alert" className="rounded border border-down/50 px-3 py-2 text-sm text-ink-2">
               {error}
             </p>
           )}
 
           {result && (
-            <div className="space-y-2 rounded border border-line bg-plane/50 px-3 py-3" aria-live="polite">
+            <div className="space-y-2 rounded border border-line bg-plane px-3 py-3" aria-live="polite">
               <div className="flex items-center justify-between">
                 <LevelBadge level={result.evaluation.level} />
                 <span className="text-sm text-ink num">Severity {result.evaluation.severity}</span>

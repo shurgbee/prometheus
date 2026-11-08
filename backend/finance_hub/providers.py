@@ -28,7 +28,11 @@ def safe_url(value):
 NUMBER = re.compile(r"(?<![\w.])[-+]?\d+(?:,\d{3})*(?:\.\d+)?(?![\w])")
 # Dates/times and link targets are not figures; tokenizing them yields fragments like "-05".
 NOT_FIGURES = re.compile(r"\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?"
-                         r"|\]\([^)]*\)|https?://\S+")
+                         r"|\[\d+\]\([^)]*\)|\]\([^)]*\)|https?://\S+"
+                         # Written-out dates; the lookahead keeps figures like "May 15%" checkable.
+                         r"|\b(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+"
+                         r"(?:\d{1,2}(?:st|nd|rd|th)?(?:,?\s+\d{4})?|\d{4})(?!\.?\d|%)"
+                         r"|\b\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?,?\s+\d{4}\b")
 LIST_MARKER = re.compile(r"^\s*\d+[.)]\s", re.M)
 SMALL_COUNT = 12  # counts and ordinals ("2 CDs", "step 3") are not checkable figures
 
@@ -54,6 +58,17 @@ def numeric_flags(answer, context):
         if not any(round(k, decimals) == value or round(k * 100, decimals) == value for k in known):
             flags.add(token)
     return sorted(flags)
+
+
+def parse_json_object(content):
+    """Parse model output, tolerating code fences or prose around the JSON object."""
+    try:
+        return json.loads(content)
+    except ValueError:
+        start, end = content.find("{"), content.rfind("}")
+        if start < 0 or end <= start:
+            raise
+        return json.loads(content[start:end + 1])
 
 
 class Providers:
@@ -157,7 +172,21 @@ class Providers:
             results.extend(items)
         return results[:25]
 
-    async def chat(self, role, system, payload, json_output=False):
+    async def general_news(self):
+        """Market-wide headlines, for events that aren't tied to one company."""
+        if self.settings.demo_mode:
+            return []
+        cached = self.news_cache.get("general")
+        if cached and (now() - cached[0]).total_seconds() < 300:
+            return cached[1]
+        raw = await self.market("news", {"category": "general"})
+        items = [{"url": n["url"], "publisher": n.get("source", "Unknown"), "published_at": str(n.get("datetime", "")),
+                  "title": n.get("headline", ""), "excerpt": n.get("summary", "")[:450]}
+                 for n in raw[:100] if safe_url(n.get("url", ""))]
+        self.news_cache["general"] = (now(), items)
+        return items
+
+    def _chat_request(self, role, system, payload):
         if self.settings.demo_mode:
             raise ProviderError("Demo model responses are produced by the graph, not external APIs")
         base = getattr(self.settings, f"{role}_base_url")
@@ -165,15 +194,56 @@ class Providers:
         body = {"model": getattr(self.settings, f"{role}_model"), "temperature": 0.2,
                 "max_tokens": 4096, "messages": [{"role": "system", "content": system},
                                                  {"role": "user", "content": json.dumps(payload, default=str)}]}
+        return base.rstrip("/") + "/chat/completions", body, {"Authorization": f"Bearer {key}"}
+
+    async def chat_stream(self, role, system, payload):
+        """Yield answer text as the model writes it. Retries only until the first token has been sent."""
+        url, body, headers = self._chat_request(role, system, payload)
+        started = False
+        for attempt in range(3):
+            try:
+                async with self.http.stream("POST", url, json={**body, "stream": True}, headers=headers) as response:
+                    if response.status_code in (429, 502, 503, 504) and attempt < 2:
+                        await asyncio.sleep(1)
+                        continue
+                    if response.is_error:
+                        raise ProviderError(f"External service returned HTTP {response.status_code}")
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data:") or line[5:].strip() == "[DONE]":
+                            continue
+                        try:
+                            text = json.loads(line[5:])["choices"][0]["delta"].get("content")
+                        except (KeyError, IndexError, TypeError, AttributeError, json.JSONDecodeError):
+                            continue
+                        if text:
+                            started = True
+                            yield text
+                    if not started:
+                        raise ProviderError("Model returned an invalid response")
+                    return
+            except httpx.HTTPError:
+                if started or attempt == 2:
+                    raise ProviderError("External service connection failed") from None
+                await asyncio.sleep(0.5 * (2 ** attempt))
+        raise ProviderError("External service unavailable")
+
+    async def chat(self, role, system, payload, json_output=False):
+        url, body, headers = self._chat_request(role, system, payload)
         if json_output:
             body["response_format"] = {"type": "json_object"}
-        raw = await self._request("POST", base.rstrip("/") + "/chat/completions", json=body,
-                                  headers={"Authorization": f"Bearer {key}"})
-        try:
-            content = raw["choices"][0]["message"]["content"]
-            return json.loads(content) if json_output else content
-        except (KeyError, IndexError, TypeError, json.JSONDecodeError):
-            raise ProviderError("Model returned an invalid response") from None
+        # Models occasionally wrap JSON in prose or return a bad reply, so structured calls get one retry.
+        for _ in range(2 if json_output else 1):
+            raw = await self._request("POST", url, json=body, headers=headers)
+            try:
+                content = raw["choices"][0]["message"]["content"]
+                if not json_output:
+                    return content
+                parsed = parse_json_object(content)
+                if isinstance(parsed, dict):
+                    return parsed
+            except (KeyError, IndexError, TypeError, ValueError):
+                pass
+        raise ProviderError("Model returned an invalid response")
 
     @property
     def embedding_model(self):
@@ -226,4 +296,6 @@ class Providers:
             holdings = (await session.scalars(select(Holding))).all()
             triggers = (await session.scalars(select(Trigger).where(Trigger.status == "active"))).all()
         return sorted({h.data["ticker"] for h in holdings if h.data.get("ticker")}
-                      | {t for trigger in triggers for t in trigger.spec["tickers"]})
+                      | {t for trigger in triggers for t in trigger.spec["tickers"]
+                         # A crypto trigger's ticker, like BTC, isn't a stock symbol it can be quoted by.
+                         if not any(":" in s["query"] for s in trigger.spec["signals"] if s["source"] == "price")})

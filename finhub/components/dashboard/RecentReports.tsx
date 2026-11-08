@@ -28,9 +28,9 @@ export function RecentReports() {
           <Skeleton className="h-14 w-full" />
         </div>
       ) : !reports.length ? (
-        <EmptyState>No reports yet. Ask the advisor to research a topic and the report lands here.</EmptyState>
+        <EmptyState>No reports yet.</EmptyState>
       ) : (
-        <ul className="divide-y divide-line border-y border-line">
+        <ul className="divide-y divide-line overflow-hidden rounded-lg border border-edge bg-surface [&>li]:px-4">
           {reports.map((r) => (
             <li key={r.id}>
               <Link href={`/reports/${encodeURIComponent(r.id)}`} className="group block py-3">

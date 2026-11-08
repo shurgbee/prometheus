@@ -32,6 +32,8 @@ export interface BackendTrigger {
   last_checked_at: string | null;
   level: "OK" | "Normal" | "Critical";
   last_severity?: number | null;
+  latest_price?: number | null;
+  event_state?: import("./types").EventState | null;
 }
 export interface BackendEvaluation {
   ts: string;

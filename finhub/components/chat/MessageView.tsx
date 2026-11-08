@@ -25,7 +25,7 @@ export function MessageView({ message, live }: { message: Message; live: boolean
   return (
     <li className="space-y-3" aria-busy={live || undefined}>
       {empty && live && (
-        <p className="flex items-center gap-2 text-sm text-ink-3">
+        <p className="flex items-center gap-2 text-sm text-ink-2">
           <Loader2 size={14} className="animate-spin" aria-hidden /> Thinking
         </p>
       )}
@@ -33,7 +33,7 @@ export function MessageView({ message, live }: { message: Message; live: boolean
       {message.parts.map((p, i) => (
         <PartView key={i} part={p} messageId={message.id} caret={live && i === message.parts.length - 1 && p.kind === "text"} />
       ))}
-      {message.stopped && <p className="text-xs text-ink-3">Stopped.</p>}
+      {message.stopped && <p className="text-xs text-ink-2">Stopped.</p>}
     </li>
   );
 }
@@ -42,15 +42,20 @@ function PartView({ part, messageId, caret }: { part: Part; messageId: string; c
   switch (part.kind) {
     case "text":
       return (
-        <div className="prose-fin text-sm" aria-live={caret ? "off" : undefined}>
+        <div className="prose-fin chat-prose text-sm" aria-live={caret ? "off" : undefined}>
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
-              a: ({ href, children }) => (
-                <a href={href} target="_blank" rel="noreferrer">
-                  {children}
-                </a>
-              ),
+              a: ({ href, children }) => {
+                const label = String(children);
+                const citation = /^\d+$/.test(label);
+                return (
+                  <a href={href} target="_blank" rel="noreferrer" className={citation ? "citation" : undefined}
+                     aria-label={citation ? `Source ${label}` : undefined}>
+                    {children}
+                  </a>
+                );
+              },
             }}
           >
             {part.text}
@@ -61,7 +66,7 @@ function PartView({ part, messageId, caret }: { part: Part; messageId: string; c
       return (
         <ul className="space-y-1 border-l border-line pl-3" aria-label="What the advisor did">
           {part.items.map((t) => (
-            <li key={t.id} className="flex items-center gap-2 text-xs text-ink-3">
+            <li key={t.id} className="flex items-center gap-2 text-xs text-ink-2">
               {t.status === "running" ? (
                 <Loader2 size={12} className="animate-spin" aria-hidden />
               ) : t.status === "error" ? (
@@ -69,7 +74,7 @@ function PartView({ part, messageId, caret }: { part: Part; messageId: string; c
               ) : (
                 <Check size={12} aria-hidden />
               )}
-              <span className={clsx(t.status === "running" && "text-ink-2")}>{t.label || t.name}</span>
+              <span className={clsx(t.status === "running" && "text-ink")}>{t.label || t.name}</span>
               {t.status === "error" && <span className="text-down">failed</span>}
             </li>
           ))}
@@ -86,9 +91,10 @@ function PartView({ part, messageId, caret }: { part: Part; messageId: string; c
                   href={s.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex max-w-[260px] items-center gap-1 rounded-pill border border-line px-2.5 py-1 text-xs text-ink-2 hover:border-line-strong hover:text-ink"
+                  className="inline-flex max-w-[260px] items-center gap-1 rounded-pill border border-line px-2.5 py-1 text-xs text-ink hover:border-line-strong hover:text-ink"
                   title={s.publisher ? `${s.title} (${s.publisher})` : s.title}
                 >
+                  <span className="shrink-0 font-medium text-accent">{i + 1}</span>
                   <span className="truncate">{s.title}</span>
                   <ExternalLink size={11} aria-hidden className="shrink-0" />
                 </a>
@@ -103,7 +109,7 @@ function PartView({ part, messageId, caret }: { part: Part; messageId: string; c
       return <ResearchNotice jobId={part.job_id} topic={part.topic} />;
     case "created":
       return (
-        <div className="rounded border border-line bg-plane/50 px-3 py-2.5">
+        <div className="rounded border border-line bg-plane px-3 py-2.5">
           <p className="flex items-center gap-1.5 text-xs text-ink-2">
             <Eye size={13} aria-hidden /> Saved watches
           </p>
@@ -121,7 +127,7 @@ function PartView({ part, messageId, caret }: { part: Part; messageId: string; c
       );
     case "error":
       return (
-        <p role="alert" className="flex items-start gap-2 rounded border border-dashed border-down/50 px-3 py-2 text-sm text-ink-2">
+        <p role="alert" className="flex items-start gap-2 rounded border border-down/50 px-3 py-2 text-sm text-ink-2">
           <CircleAlert size={15} className="mt-0.5 shrink-0 text-down" aria-hidden />
           {part.message}
         </p>

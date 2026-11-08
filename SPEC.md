@@ -20,7 +20,7 @@ Non-goals
 Trade execution or brokerage connections.
 Account aggregation such as Plaid.
 Multi-user accounts, tax planning and retirement modelling.
-Claims of personalised investment advice. Every agent answer carries an "educational, not financial advice" note.
+Claims of personalised investment advice. The chat panel always shows an "educational, not financial advice" note, and every report carries one.
 Demo success criteria
 
 The Tesla question goes end to end (answer, then triggers accepted, then report requested) in under 3 minutes.
@@ -103,7 +103,7 @@ Guardrails
 Every price, percentage or holding figure comes from a tool result in the same turn, never from the model's memory. A post-check flags numbers with no tool source.
 Factual claims carry a citation, or say plainly that they are unverified.
 No trade actions exist in the toolset. Requests to buy or sell get an explanation, not an order.
-Each answer ends with an "educational, not financial advice" note.
+The chat panel permanently shows an "educational, not financial advice" note, so individual answers do not repeat it.
 Conversation state persists through LangGraph's Postgres checkpointer in Tiger DB, so threads survive restarts.
 Research agent and report index
 The research agent is an asynchronous LangGraph subgraph that writes a cited report in about 2–5 minutes. It prefers official APIs and uses Steel Browser only for pages that have no API. Finished reports are chunked, embedded with a Nemotron embedding model and searched with vector + BM25 retrieval followed by a Nemotron reranker.

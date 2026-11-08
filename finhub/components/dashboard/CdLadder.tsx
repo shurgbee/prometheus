@@ -12,15 +12,15 @@ export function CdLadder() {
 
   return (
     <section aria-labelledby="cd-title">
-      <SectionHeader id="cd-title" title="CD ladder" description="Soonest maturity first. Value includes interest earned so far." />
+      <SectionHeader id="cd-title" title="CD ladder" />
       {error && !data ? (
         <ErrorNote error={error} what="CDs" onRetry={() => mutate()} />
       ) : isLoading && !data ? (
         <Skeleton className="h-24 w-full" />
       ) : !cds.length ? (
-        <EmptyState>No CDs yet. Add one on the Holdings page to see it here.</EmptyState>
+        <EmptyState>No CDs yet.</EmptyState>
       ) : (
-        <ul className="divide-y divide-line border-y border-line">
+        <ul className="divide-y divide-line overflow-hidden rounded-lg border border-edge bg-surface [&>li]:px-4">
           {cds.map((cd) => {
             const left = daysUntil(cd.maturity_date);
             const total = cd.start_date && cd.maturity_date ? daysUntil(cd.maturity_date, new Date(`${cd.start_date}T12:00:00Z`)) : null;

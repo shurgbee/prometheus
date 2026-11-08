@@ -24,9 +24,6 @@ export default function ReportsPage() {
     <div className="space-y-10">
       <header>
         <h1 className="font-display font-semibold text-3xl text-ink sm:text-[44px] sm:leading-[48px]">Reports</h1>
-        <p className="mt-2 max-w-prose text-ink-2">
-          Research the advisor wrote for you, with sources. Search by meaning: &ldquo;EV subsidies&rdquo; also finds reports about tax credits.
-        </p>
       </header>
 
       <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
@@ -64,9 +61,9 @@ export default function ReportsPage() {
                   </p>
                 )}
                 {!searching && !data?.results.length ? (
-                  <EmptyState>No reports yet. Start one on the right, or ask the advisor to research something.</EmptyState>
+                  <EmptyState>No reports yet.</EmptyState>
                 ) : (
-                  <ul className="divide-y divide-line border-y border-line">
+                  <ul className="divide-y divide-line overflow-hidden rounded-lg border border-edge bg-surface [&>li]:px-4">
                     {data?.results.map((hit) => (
                       <ReportRow key={hit.report.id} report={hit.report} passage={hit.passage} />
                     ))}
@@ -76,7 +73,7 @@ export default function ReportsPage() {
               {searching && !!data?.similar.length && (
                 <div>
                   <h2 className="section-title mb-2 text-xl">Similar reports</h2>
-                  <ul className="divide-y divide-line border-y border-line">
+                  <ul className="divide-y divide-line overflow-hidden rounded-lg border border-edge bg-surface [&>li]:px-4">
                     {data.similar.map((r) => (
                       <ReportRow key={r.id} report={r} />
                     ))}
@@ -133,11 +130,10 @@ function NewReport() {
   }
 
   return (
-    <aside aria-labelledby="new-report-title" className="h-fit rounded-lg border border-line bg-surface p-4">
+    <aside aria-labelledby="new-report-title" className="h-fit rounded-lg border border-edge bg-surface p-4">
       <h2 id="new-report-title" className="text-sm font-semibold text-ink">
         Start a report
       </h2>
-      <p className="mt-1 text-xs text-ink-3">The research agent gathers sources and writes a cited report in a couple of minutes.</p>
       <form onSubmit={start} className="mt-3 space-y-2">
         <label htmlFor="new-report-topic" className="sr-only">
           Report topic

@@ -3,6 +3,7 @@ import type { Alert, SignalSpec } from "./api";
 const SOURCE_LABELS: Record<string, string> = {
   price: "Price",
   news: "News",
+  event: "Event",
   sec_edgar: "SEC filings",
   federal_register: "Federal Register",
   nhtsa: "NHTSA recalls",
@@ -28,6 +29,12 @@ export function pollLabel(poll: string): string {
 }
 
 export function signalSummary(s: SignalSpec): string {
+  const level = s.params?.level;
+  if (s.detector === "price_level" && typeof level === "number") {
+    const move = s.params?.direction === "below" ? "Falls to" : "Rises to";
+    return `${move} $${level.toLocaleString("en-US")}, ${pollLabel(s.poll)}`;
+  }
+  if (s.detector === "event_occurs") return `Checks news ${pollLabel(s.poll)}, alerts once`;
   return `${signalLabel(s.source)}, ${pollLabel(s.poll)}`;
 }
 

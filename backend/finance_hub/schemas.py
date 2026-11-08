@@ -47,21 +47,38 @@ class HoldingInput(StrictModel):
 
 
 class SignalSpec(StrictModel):
-    source: Literal["price", "news"]
+    source: Literal["price", "news", "event"]
     query: str = Field(min_length=1, max_length=500)
-    detector: Literal["daily_change", "text_event"]
+    detector: Literal["daily_change", "price_level", "text_event", "event_occurs"]
     params: dict = Field(default_factory=dict)
     poll: Duration = "5m"
 
     @model_validator(mode="after")
     def supported_detector(self):
-        if (self.source, self.detector) not in (("price", "daily_change"), ("news", "text_event")):
-            raise ValueError("MVP supports price/daily_change and news/text_event")
+        if (self.source, self.detector) not in (("price", "daily_change"), ("price", "price_level"),
+                                                ("news", "text_event"), ("event", "event_occurs")):
+            raise ValueError("Unsupported source and detector combination")
         if seconds(self.poll) < (60 if self.source == "price" else 300):
             raise ValueError("Minimum price poll is 1m; news poll is 5m")
-        if self.source == "price" and not re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,14}", self.query):
+        # Crypto quotes use an EXCHANGE:PAIR symbol, such as BINANCE:BTCUSDT.
+        if self.source == "price" and not re.fullmatch(r"[A-Z][A-Z0-9.\-]{0,14}|[A-Z]{2,20}:[A-Z0-9\-]{2,20}", self.query):
             raise ValueError("Price query must be one uppercase ticker")
-        unknown = set(self.params) - {"threshold_percent", "keywords"}
+        if self.detector == "price_level":
+            level = self.params.get("level")
+            if isinstance(level, bool) or not isinstance(level, (int, float)) or level <= 0:
+                raise ValueError("price_level requires a positive level")
+            if self.params.get("direction") not in ("above", "below"):
+                raise ValueError("price_level direction must be above or below")
+        if self.detector == "event_occurs":
+            condition = self.params.get("condition")
+            if not isinstance(condition, str) or not condition.strip() or len(condition) > 500:
+                raise ValueError("event_occurs requires a condition")
+            if "deadline" in self.params:
+                try:
+                    date.fromisoformat(self.params["deadline"])
+                except (TypeError, ValueError):
+                    raise ValueError("deadline must be an ISO date") from None
+        unknown = set(self.params) - {"threshold_percent", "keywords", "level", "direction", "condition", "deadline"}
         if unknown:
             raise ValueError("Unknown detector params")
         threshold = self.params.get("threshold_percent", 3)
@@ -81,12 +98,19 @@ class Cooldown(StrictModel):
 class TriggerSpec(StrictModel):
     name: str = Field(min_length=1, max_length=200)
     entity: str = Field(min_length=1, max_length=200)
-    tickers: list[Ticker] = Field(min_length=1, max_length=10)
+    tickers: list[Ticker] = Field(max_length=10)
     hypothesis: str = Field(min_length=1, max_length=1000)
     signals: list[SignalSpec] = Field(min_length=1, max_length=10)
     critical_capable: bool = False
     pinned: bool = False
     cooldown: Cooldown = Field(default_factory=Cooldown)
+
+    @model_validator(mode="after")
+    def tickers_unless_market_wide_event(self):
+        # An event like a Fed decision isn't tied to one company.
+        if not self.tickers and any(s.detector != "event_occurs" for s in self.signals):
+            raise ValueError("At least one ticker is required")
+        return self
 
 
 class TriggerCreate(StrictModel):

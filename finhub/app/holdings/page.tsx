@@ -31,19 +31,16 @@ export default function HoldingsPage() {
     <div className="space-y-12">
       <header>
         <h1 className="font-display font-semibold text-3xl text-ink sm:text-[44px] sm:leading-[48px]">Holdings</h1>
-        <p className="mt-2 max-w-prose text-ink-2">
-          Everything the dashboard adds up. Stocks are priced live; cash is the balance you enter; CDs grow with their APY.
-        </p>
       </header>
 
       <section aria-labelledby="list-title">
-        <SectionHeader id="list-title" title="Your holdings" description={data ? `${data.holdings.length} holdings, ${money(data.total)} in total` : undefined} />
+        <SectionHeader id="list-title" title="Your holdings" />
         {error && !data ? (
           <ErrorNote error={error} what="holdings" onRetry={() => mutate()} />
         ) : isLoading && !data ? (
           <Skeleton className="h-64 w-full" />
         ) : !data?.holdings.length ? (
-          <EmptyState>No holdings yet. Add one below or import a CSV.</EmptyState>
+          <EmptyState>No holdings yet.</EmptyState>
         ) : (
           <div className="space-y-8">
             {GROUPS.map((g) => {
@@ -52,7 +49,7 @@ export default function HoldingsPage() {
               return (
                 <div key={g.key}>
                   <h3 className="mb-2 text-sm font-semibold text-ink-2">{g.label}</h3>
-                  <ul className="divide-y divide-line border-y border-line">
+                  <ul className="divide-y divide-line overflow-hidden rounded-lg border border-edge bg-surface [&>li]:px-4">
                     {rows.map((h) => (
                       <HoldingRow key={h.id} holding={h} />
                     ))}
@@ -67,7 +64,7 @@ export default function HoldingsPage() {
       <div className="grid gap-12 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <section aria-labelledby="add-title">
           <SectionHeader id="add-title" title="Add a holding" />
-          <div className="rounded-lg border border-line bg-surface p-4">
+          <div className="rounded-lg border border-edge bg-surface p-4">
             <HoldingForm
               submitLabel="Add holding"
               onSubmit={async (input) => {
@@ -204,7 +201,7 @@ function CsvImport() {
   return (
     <section aria-labelledby="import-title">
       <SectionHeader id="import-title" title="Import a CSV" />
-      <div className="space-y-3 rounded-lg border border-line bg-surface p-4">
+      <div className="space-y-3 rounded-lg border border-edge bg-surface p-4">
         <p className="text-sm text-ink-2">
           One row per holding. APY is a fraction (0.046 for 4.6%), dates are YYYY-MM-DD, and cost basis is the total stock position cost (shares × average purchase price).
         </p>
