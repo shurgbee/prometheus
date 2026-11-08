@@ -30,7 +30,7 @@ export default function HoldingsPage() {
   return (
     <div className="space-y-12">
       <header>
-        <h1 className="font-serif text-3xl text-ink sm:text-[44px] sm:leading-[48px]">Holdings</h1>
+        <h1 className="font-display font-semibold text-3xl text-ink sm:text-[44px] sm:leading-[48px]">Holdings</h1>
         <p className="mt-2 max-w-prose text-ink-2">
           Everything the dashboard adds up. Stocks are priced live; cash is the balance you enter; CDs grow with their APY.
         </p>

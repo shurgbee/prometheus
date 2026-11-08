@@ -1,7 +1,7 @@
 [project]
 name = "prometheus-finance-hub"
 version = "0.1.0"
-description = "Finance Hub FastAPI backend and durable worker"
+description = "Prometheus FastAPI backend and durable worker"
 requires-python = ">=3.11,<3.14"
 dependencies = [
   "fastapi>=0.115,<1", "uvicorn>=0.34,<1", "httpx>=0.28,<1",

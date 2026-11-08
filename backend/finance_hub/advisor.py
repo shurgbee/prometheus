@@ -163,7 +163,9 @@ class Advisor:
                 if cited - allowed or (intent == "curiosity" and not cited):
                     answer = "The answer could not be verified against available sources. Please retry."
             answer += " " + " ".join(errors)
-        context["numeric_flags"] = numeric_flags(answer, context) if not self.providers.settings.demo_mode else []
+        # The model also sees the user's message and the proposal drafts, so their numbers are grounded too.
+        context["numeric_flags"] = (numeric_flags(answer, {"tools": context, "proposals": proposals, "message": message})
+                                    if not self.providers.settings.demo_mode else [])
         if context["numeric_flags"]:
             answer += "\nUnverified numeric tokens: " + ", ".join(context["numeric_flags"])
         answer = answer.rstrip() + "\n\n" + DISCLAIMER

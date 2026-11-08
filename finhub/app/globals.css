@@ -65,7 +65,7 @@
     @apply w-full rounded border border-line-strong bg-raised px-3 py-2 text-sm text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none;
   }
   .section-title {
-    @apply font-serif text-2xl font-normal text-ink;
+    @apply font-display font-semibold text-2xl text-ink;
   }
   .label {
     @apply text-xs text-ink-3;
@@ -83,7 +83,7 @@
 .prose-fin h1,
 .prose-fin h2,
 .prose-fin h3 {
-  @apply font-serif font-normal text-ink;
+  @apply font-display font-semibold text-ink;
   margin-top: 1.4em;
 }
 .prose-fin h1 {

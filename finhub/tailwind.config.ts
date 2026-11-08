@@ -35,8 +35,8 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ['"Plus Jakarta Sans"', "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
-        serif: ['"Instrument Serif"', "Georgia", "serif"],
+        sans: ["Manrope", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
+        display: ["Manrope", "system-ui", "-apple-system", "Segoe UI", "sans-serif"],
         dot: ["Doto", "ui-monospace", "monospace"],
       },
       fontSize: {
@@ -49,7 +49,7 @@ const config: Config = {
         xl: ["22px", { lineHeight: "30px" }],
         "2xl": ["28px", { lineHeight: "34px" }],
         "3xl": ["36px", { lineHeight: "40px" }],
-        hero: ["56px", { lineHeight: "60px", letterSpacing: "-0.03em" }],
+        hero: ["56px", { lineHeight: "60px", letterSpacing: "-0.015em" }],
       },
       borderRadius: {
         sm: "6px",

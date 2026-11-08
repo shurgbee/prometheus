@@ -1,4 +1,4 @@
-# Finance Hub frontend
+# Prometheus frontend
 
 Next.js dashboard, advisor chat, reports and holdings editor, integrated with the FastAPI backend
 in `../backend`. The default uses that backend. Synthetic data and phone delivery are clearly

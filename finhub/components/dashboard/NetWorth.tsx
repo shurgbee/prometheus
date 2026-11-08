@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Sector } from "recharts";
 import { usePortfolio } from "@/lib/hooks";
-import { dateTime, money, pct, splitMoney } from "@/lib/format";
+import { dateTime, money, pct } from "@/lib/format";
+import CountUp from "@/components/CountUp";
 import { Delta, ErrorNote, Skeleton } from "@/components/ui";
 
 const CLASSES = [
@@ -11,6 +12,21 @@ const CLASSES = [
   { key: "cd", label: "CDs", color: "#D95926" },
   { key: "stocks", label: "Stocks", color: "#199E70" },
 ] as const;
+
+const SWEEP_MS = 900;
+
+// Recharts animates in JS, so the global prefers-reduced-motion CSS rule does not reach it.
+function useReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduced(query.matches);
+    const onChange = (e: MediaQueryListEvent) => setReduced(e.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
+  return reduced;
+}
 
 export function NetWorth() {
   const { data, error, isLoading, mutate } = usePortfolio();
@@ -48,11 +64,22 @@ export function NetWorth() {
 }
 
 function Hero({ value }: { value: number }) {
-  const { whole, cents } = splitMoney(value);
   return (
-    <p className="mt-1 text-[44px] font-semibold leading-[1.05] tracking-[-0.03em] text-ink sm:text-hero" aria-label={money(value, { cents: true })}>
-      {whole}
-      <span className="text-ink-3">{cents}</span>
+    <p className="mt-1 text-[44px] font-bold leading-[1.05] tracking-[-0.015em] text-ink sm:text-hero" aria-label={money(value, { cents: true })}>
+      <CountUp
+        to={value}
+        mode="roll"
+        easing="expo"
+        duration={1}
+        decimals={2}
+        prefix="$"
+        separator=","
+        trigger="load"
+        fractionClassName="text-ink-3"
+        proportional
+        className="inline-block align-top"
+        style={{ marginBlock: "-0.075em" }} // keeps the roll's 1.2em cells inside the original line height
+      />
     </p>
   );
 }
@@ -67,6 +94,7 @@ function Allocation({
   loading: boolean;
 }) {
   const [active, setActive] = useState<number | null>(null);
+  const reducedMotion = useReducedMotion();
 
   if (!loading && allocation && total == null) return <p className="text-sm text-ink-3">Allocation weights await complete pricing.</p>;
   if (loading || !allocation || total == null) {
@@ -102,7 +130,10 @@ function Allocation({
               endAngle={-270}
               stroke="#14110F"
               strokeWidth={2}
-              isAnimationActive={false}
+              isAnimationActive={!reducedMotion}
+              animationBegin={0}
+              animationDuration={SWEEP_MS}
+              animationEasing="ease-out"
               activeIndex={active ?? undefined}
               activeShape={(props: unknown) => {
                 const p = props as React.ComponentProps<typeof Sector>;
@@ -118,7 +149,10 @@ function Allocation({
           </PieChart>
         </ResponsiveContainer>
         {focus && (
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+          <div
+            className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center"
+            style={{ animation: `row-in 380ms cubic-bezier(0.2, 0.7, 0.2, 1) ${SWEEP_MS * 0.6}ms both` }}
+          >
             <span className="text-lg font-semibold text-ink">{pct(focus.share, 0)}</span>
             <span className="text-2xs text-ink-3">{focus.label}</span>
           </div>

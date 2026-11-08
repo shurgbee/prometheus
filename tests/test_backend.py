@@ -196,3 +196,28 @@ def test_failed_turn_can_be_recovered_without_treating_it_as_an_approval(client,
     restored = client.get(f"/api/chat/{thread}").json()
     assert not restored["retryable"]
     assert restored["research_job"]["status"] == "queued"
+
+
+def test_numeric_flags_accepts_datetime_context():
+    # Live-mode advisor context includes datetimes (quote timestamps); flagging must not crash on them.
+    from datetime import datetime, timezone
+    from finance_hub.providers import numeric_flags
+    context = {"prices": [{"ticker": "TSLA", "price": 412.5, "ts": datetime(2026, 11, 7, tzinfo=timezone.utc)}]}
+    assert numeric_flags("TSLA trades at 412.5, up 9.9%.", context) == ["9.9"]
+
+
+def test_numeric_flags_matches_values_not_formatting():
+    from finance_hub.providers import numeric_flags
+    context = {"total": 121892.78, "cash": 30000.0, "apy": 0.045, "weight": 0.246118, "change": -0.36,
+               "maturity_date": "2027-05-01", "quote_ts": "2026-11-06T21:00:00+00:00"}
+    answer = ("1. Net worth is $121,892.78 (about $121,893), with $30,000.00 in cash (24.61% or 24.6%).\n"
+              "2. The CD earns 4.50% and matures 2027-05-01; the price moved +0.36 as of 2026-11-06T21:00:00Z.\n"
+              "You hold 2 CDs. See [source](https://example.com/2024/987654).")
+    assert numeric_flags(answer, context) == []
+
+
+def test_numeric_flags_still_flags_unsupported_figures():
+    from finance_hub.providers import numeric_flags
+    context = {"total": 121892.78, "weight": 0.246118}
+    assert numeric_flags("Net worth is $125,000 and stocks are 31.5% of it, up 63.76%.", context) == \
+        ["125,000", "31.5", "63.76"]

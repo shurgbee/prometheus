@@ -87,7 +87,7 @@ def create_app(settings: Settings | None = None):
             await providers.close()
             await db.close()
 
-    app = FastAPI(title="Finance Hub Backend", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="Prometheus Backend", version="0.1.0", lifespan=lifespan)
     app.state.settings, app.state.db = settings, db
     app.state.providers, app.state.research, app.state.triggers = providers, research, triggers
     app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins,

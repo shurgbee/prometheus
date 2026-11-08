@@ -1,4 +1,4 @@
-"""Start the API, worker and finhub against the same root .env without exposing API_TOKEN to JS."""
+"""Start the API, worker and the finhub frontend against the same root .env without exposing API_TOKEN to JS."""
 import argparse
 import os
 import signal
@@ -58,7 +58,7 @@ def main():
     try:
         for command, cwd in commands:
             children.append(subprocess.Popen(command, cwd=cwd, env=env, start_new_session=True))
-        print(f"Finance Hub: http://127.0.0.1:{args.web_port} ({'demo' if settings.demo_mode else 'live'})", flush=True)
+        print(f"Prometheus: http://127.0.0.1:{args.web_port} ({'demo' if settings.demo_mode else 'live'})", flush=True)
         while all(child.poll() is None for child in children):
             time.sleep(.5)
         failed = next(child for child in children if child.poll() is not None)

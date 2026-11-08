@@ -12,10 +12,10 @@ class Settings(BaseSettings):
     cors_origins: list[str] = ["http://localhost:3000"]
     nvidia_api_key: str = ""
     super_base_url: str = "https://integrate.api.nvidia.com/v1"
-    super_model: str = "nvidia/nemotron-3-super-120b-a12b"
+    super_model: str = "nvidia/nemotron-3.5-super-vl-120b-a12b"
     super_api_key: str = ""
     nano_base_url: str = "https://integrate.api.nvidia.com/v1"
-    nano_model: str = "nvidia/nemotron-3-nano-30b-a3b"
+    nano_model: str = "nvidia/nemotron-3.5-lightning-30b-a3b"
     nano_api_key: str = ""
     embed_base_url: str = "https://integrate.api.nvidia.com/v1"
     embed_model: str = "nvidia/llama-nemotron-embed-vl-1b-v2"

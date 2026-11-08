@@ -1,1 +1,1 @@
-"""Single-user, advice-only Finance Hub backend."""
+"""Single-user, advice-only Prometheus backend."""

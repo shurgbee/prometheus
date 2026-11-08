@@ -46,7 +46,7 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
     <div className="flex h-full flex-col border-l border-line bg-surface">
       <div className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-line px-5">
         <div>
-          <h2 className="font-serif text-xl leading-none text-ink">Advisor</h2>
+          <h2 className="font-display font-semibold text-xl leading-none text-ink">Advisor</h2>
         </div>
         <div className="flex items-center gap-1">
           {messages.length > 0 && (
@@ -71,7 +71,7 @@ export function ChatPanel({ onClose }: { onClose: () => void }) {
       >
         {messages.length === 0 ? (
           <div className="flex h-full flex-col justify-end pb-2">
-            <p className="font-serif text-[28px] leading-[1.15] text-ink">
+            <p className="font-display font-semibold text-[28px] leading-[1.15] text-ink">
               Noticed something?
               <br />
               <span className="text-ink-3">Let&apos;s find out what it means for your money.</span>

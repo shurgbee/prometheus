@@ -25,11 +25,35 @@ def safe_url(value):
     return parsed.scheme in ("https", "http") and bool(parsed.hostname)
 
 
+NUMBER = re.compile(r"(?<![\w.])[-+]?\d+(?:,\d{3})*(?:\.\d+)?(?![\w])")
+# Dates/times and link targets are not figures; tokenizing them yields fragments like "-05".
+NOT_FIGURES = re.compile(r"\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?"
+                         r"|\]\([^)]*\)|https?://\S+")
+LIST_MARKER = re.compile(r"^\s*\d+[.)]\s", re.M)
+SMALL_COUNT = 12  # counts and ordinals ("2 CDs", "step 3") are not checkable figures
+
+
 def numeric_flags(answer, context):
-    """Conservative flagger: permits only number tokens present in this turn's tool context."""
-    pattern = r"(?<![\w])[-+]?\d+(?:,\d{3})*(?:\.\d+)?"
-    known = {m.replace(",", "").lstrip("+") for m in re.findall(pattern, json.dumps(context))}
-    return sorted({m for m in re.findall(pattern, answer) if m.replace(",", "").lstrip("+") not in known})
+    """Conservative flagger: permits only numbers whose value appears in this turn's tool context.
+
+    A number in the answer matches a context value when it equals that value, or that value
+    times 100 (fractions shown as percents), rounded to the answer's own precision. Sign and
+    thousands separators are ignored, so "$30,000.00", "4.50%" and "+0.36" match 30000.0, 0.045
+    and 0.36. Derived arithmetic the model performs itself is still flagged.
+    """
+    def figures(text):
+        for token in NUMBER.findall(NOT_FIGURES.sub(" ", text)):
+            digits = token.lstrip("+-").replace(",", "")
+            yield token, float(digits), len(digits.partition(".")[2])
+
+    known = {value for _, value, _ in figures(json.dumps(context, default=str))}
+    flags = set()
+    for token, value, decimals in figures(LIST_MARKER.sub(" ", answer)):
+        if decimals == 0 and value <= SMALL_COUNT:
+            continue
+        if not any(round(k, decimals) == value or round(k * 100, decimals) == value for k in known):
+            flags.add(token)
+    return sorted(flags)
 
 
 class Providers:

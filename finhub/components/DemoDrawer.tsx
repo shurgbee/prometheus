@@ -112,7 +112,7 @@ export function DemoDrawer({ open, onClose }: { open: boolean; onClose: () => vo
         )}
       >
         <div className="flex h-14 shrink-0 items-center justify-between border-b border-line px-5">
-          <h2 id="demo-title" className="font-serif text-xl text-ink">
+          <h2 id="demo-title" className="font-display font-semibold text-xl text-ink">
             Demo events
           </h2>
           <button ref={closeBtn} className="btn-quiet" onClick={onClose} aria-label="Close demo events">

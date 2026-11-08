@@ -46,7 +46,7 @@ export default function ReportPage() {
       ) : (
         <>
           <header className="mt-6 border-b border-line pb-6">
-            <h1 className="font-serif text-3xl leading-tight text-ink sm:text-[44px] sm:leading-[1.08]">{r.title}</h1>
+            <h1 className="font-display font-semibold text-3xl leading-tight text-ink sm:text-[44px] sm:leading-[1.08]">{r.title}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-ink-3">
               <span>{shortDate(r.created_at)}</span>
               {r.tickers.map((t) => (
@@ -104,7 +104,7 @@ export default function ReportPage() {
                 {r.similar.map((s) => (
                   <li key={s.id}>
                     <Link href={`/reports/${encodeURIComponent(s.id)}`} className="group block py-3">
-                      <p className="font-serif text-lg text-ink group-hover:text-accent">{s.title}</p>
+                      <p className="font-display font-semibold text-lg text-ink group-hover:text-accent">{s.title}</p>
                       <p className="mt-0.5 line-clamp-1 text-sm text-ink-3">{s.summary}</p>
                     </Link>
                   </li>

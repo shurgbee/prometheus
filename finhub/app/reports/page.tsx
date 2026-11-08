@@ -23,7 +23,7 @@ export default function ReportsPage() {
   return (
     <div className="space-y-10">
       <header>
-        <h1 className="font-serif text-3xl text-ink sm:text-[44px] sm:leading-[48px]">Reports</h1>
+        <h1 className="font-display font-semibold text-3xl text-ink sm:text-[44px] sm:leading-[48px]">Reports</h1>
         <p className="mt-2 max-w-prose text-ink-2">
           Research the advisor wrote for you, with sources. Search by meaning: &ldquo;EV subsidies&rdquo; also finds reports about tax credits.
         </p>
@@ -97,7 +97,7 @@ function ReportRow({ report: r, passage }: { report: ReportSummary; passage?: st
   return (
     <li>
       <Link href={`/reports/${encodeURIComponent(r.id)}`} className="group block py-4">
-        <p className="font-serif text-xl leading-snug text-ink group-hover:text-accent">{r.title}</p>
+        <p className="font-display font-semibold text-xl leading-snug text-ink group-hover:text-accent">{r.title}</p>
         <p className="mt-1 line-clamp-2 text-sm text-ink-2">{passage ? <>&ldquo;{passage}&rdquo;</> : r.summary}</p>
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-ink-3">
           <span>{relativeTime(r.created_at)}</span>

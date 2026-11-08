@@ -31,8 +31,8 @@ export function TopBar({ onOpenChat, onOpenDemo }: { onOpenChat: () => void; onO
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-plane/85 backdrop-blur sm:h-[57px]">
       <div className="flex flex-wrap items-center gap-x-3 px-4 sm:h-14 sm:flex-nowrap sm:gap-6 sm:px-8">
-        <Link href="/" className="flex h-14 items-center font-dot text-xl font-semibold tracking-wide text-ink sm:h-auto" aria-label="Finance Hub home">
-          finhub
+        <Link href="/" className="flex h-14 items-center font-dot text-xl font-black tracking-wide text-ink sm:h-auto" aria-label="Prometheus home">
+          prometheus
         </Link>
 
         <nav aria-label="Main" className="order-last -mx-1 flex w-full min-w-0 items-center gap-0.5 pb-2 sm:order-none sm:mx-0 sm:w-auto sm:gap-1 sm:pb-0">
@@ -72,7 +72,7 @@ export function TopBar({ onOpenChat, onOpenDemo }: { onOpenChat: () => void; onO
               {open ? "Market open" : "Market closed"}
             </span>
           )}
-          <span className="hidden border-l border-line pl-3 font-dot text-sm font-semibold text-ink-2 sm:inline" suppressHydrationWarning>
+          <span className="hidden border-l border-line pl-3 font-dot text-sm font-black text-ink-2 sm:inline" suppressHydrationWarning>
             {now ? clockLabel(now) : " "}
           </span>
           {(USE_MOCKS || portfolio?.dev_injection_enabled) && <button onClick={onOpenDemo} className="btn-quiet" title="Send a test event through a trigger">
