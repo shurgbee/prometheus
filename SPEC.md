@@ -178,6 +178,7 @@ Critical requires all three: M ≥ 0.6, critical_capable = true, and E ≥ 0.05 
 The model's adjustment is clamped to ±15 points and cannot invent evidence. Each alert needs at least one stored signal event.
 Dedupe: an alert for the same trigger and event cluster (embedding similarity ≥ 0.85) within its cooldown is suppressed. It re-alerts only if the score rises by 20 or more.
 At most 3 calls per day across all triggers. Further critical alerts send a text marked CRITICAL.
+Explicitly marked test calls do not count toward the daily alert-call limit.
 Runtime
 
 A worker process runs an asyncio scheduler. Each due signal runs a small LangGraph graph: fetch, detect, then (if fired) triage, score, decide and dispatch.

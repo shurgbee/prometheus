@@ -263,9 +263,10 @@ class TriggerService:
             alert.attempts += 1
             alert.delivery_status = "sending"
             alert.next_attempt_at = now() + timedelta(seconds=120)
+            dashboard = self.providers.settings.dashboard_url.rstrip("/")
             payload = {"alert_id": alert.id, "level": alert.level, "phone": self.providers.settings.alert_phone,
-                       "title": trigger.spec["name"], "summary": alert.summary,
-                       "url": f"{self.providers.settings.dashboard_url}/?alert={alert.id}", "channel": alert.channel}
+                       "title": trigger.spec["name"], "summary": alert.summary, "severity": round(alert.severity),
+                       "url": f"{dashboard}/?alert={alert.id}", "channel": alert.channel}
             alert_id = alert.id
             await session.commit()
         if self.providers.settings.demo_mode:

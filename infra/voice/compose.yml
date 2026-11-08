@@ -1,0 +1,87 @@
+name: prometheus-voice
+services:
+  redis:
+    image: ${REDIS_IMAGE:-redis:7-alpine}
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports: ["127.0.0.1:16379:6379"]
+    volumes: ["./data/redis:/data"]
+  livekit:
+    image: ${LIVEKIT_IMAGE:-livekit/livekit-server:latest}
+    restart: unless-stopped
+    network_mode: host
+    command: --config /etc/livekit.yaml
+    volumes: ["./runtime/livekit.yaml:/etc/livekit.yaml:ro"]
+    depends_on: [redis]
+  sip:
+    image: ${SIP_IMAGE:-livekit/sip:latest}
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      SIP_CONFIG_BODY: |
+        api_key: ${LIVEKIT_API_KEY}
+        api_secret: ${LIVEKIT_API_SECRET}
+        ws_url: ws://127.0.0.1:7880
+        redis:
+          address: 127.0.0.1:16379
+        sip_port: 5060
+        rtp_port: 10000-10100
+        nat_1_to_1_ip: ${PUBLIC_IP}
+        hide_inbound_port: true
+        health_port: 8081
+        logging:
+          level: info
+    depends_on: [livekit]
+  riva:
+    profiles: [riva]
+    image: ${RIVA_IMAGE:-nvcr.io/nim/nvidia/magpie-tts-multilingual:latest}
+    restart: unless-stopped
+    gpus: all
+    shm_size: 8gb
+    environment:
+      NGC_API_KEY: ${NGC_API_KEY}
+      NIM_HTTP_API_PORT: "9000"
+      NIM_GRPC_API_PORT: "50051"
+      NIM_TAGS_SELECTOR: name=magpie-tts-multilingual
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:50051:50051"]
+    volumes: ["/ephemeral/prometheus-voice-cache:/opt/nim/.cache"]
+  kokoro:
+    profiles: [kokoro]
+    build:
+      context: ../..
+      dockerfile: infra/voice/kokoro.Dockerfile
+    restart: unless-stopped
+    gpus: all
+    environment:
+      HF_HOME: /models
+      HF_HUB_DISABLE_XET: "1"
+    ports: ["127.0.0.1:9000:9000"]
+    volumes: ["/ephemeral/prometheus-kokoro-cache:/models"]
+  gateway:
+    build:
+      context: ../..
+      dockerfile: infra/voice/Dockerfile
+    restart: unless-stopped
+    network_mode: host
+    env_file: ../../.env
+    environment:
+      LIVEKIT_URL: ws://127.0.0.1:7880
+      RIVA_URL: http://127.0.0.1:9000
+      VOICE_DATA: /data
+    volumes: ["./data/gateway:/data"]
+    depends_on: [sip]
+  notifier:
+    build:
+      context: ../..
+      dockerfile: infra/voice/notifier.Dockerfile
+    restart: unless-stopped
+    network_mode: host
+    env_file: ../../.env
+    environment:
+      NOTIFIER_HOST: "127.0.0.1"
+      NOTIFIER_PORT: "8001"
+      NOTIFIER_ENV_FILE: /nonexistent
+      NOTIFIER_STORE_PATH: /data/deliveries.json
+      VOICE_GATEWAY_URL: http://127.0.0.1:8002
+    volumes: ["./data/notifier:/data"]
+    depends_on: [gateway]

@@ -1,0 +1,6 @@
+{
+  "LIVEKIT_IMAGE": "livekit/livekit-server@sha256:25cd902de7cacbd5f1f779f6a6ac1eae20ba8f56b0935934ce6b0ab80d1e3d20",
+  "SIP_IMAGE": "livekit/sip@sha256:26b5e320482c48d999073dfaf830666b1a312ad0f97d35ae67bd499659b9834e",
+  "REDIS_IMAGE": "redis@sha256:c5d34a98396a4775e223c74e929162c35c5a2182901ba26b50ade939941ce14b",
+  "RIVA_IMAGE": "nvcr.io/nim/nvidia/magpie-tts-multilingual@sha256:74541e6db786abe56529801f0db42a5892b6530f3134295aa7909258c9e40ba5"
+}

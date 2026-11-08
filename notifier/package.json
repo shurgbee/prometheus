@@ -1,0 +1,32 @@
+{
+  "name": "finance-hub-notifier",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Delivers Finance Hub alerts as iMessage texts through Photon",
+  "type": "module",
+  "engines": {
+    "node": ">=20.12"
+  },
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "dev": "tsx watch src/server.ts",
+    "send-test": "tsx src/send-test.ts",
+    "photon-doctor": "tsx src/doctor.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "tsx --test test/*.test.ts"
+  },
+  "dependencies": {
+    "@spectrum-ts/core": "12.15.0",
+    "@spectrum-ts/imessage": "12.15.0",
+    "tsx": "^4.19.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "fsevents@2.3.3": true,
+    "protobufjs@7.6.6": true
+  }
+}
