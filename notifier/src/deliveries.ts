@@ -12,6 +12,7 @@ export interface DeliveryOptions {
   fetchImpl?: typeof fetch;
   voice?: VoiceSender;
   voiceRetryDelayMs?: number;
+  textRecipient?: string;
 }
 
 const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
@@ -38,7 +39,7 @@ export class DeliveryService {
   accept(alert: AlertPayload): { record: DeliveryRecord; duplicate: boolean } {
     const existing = this.store.get(alert.alert_id);
     if (existing) return { record: existing, duplicate: true };
-    const record = this.store.insert(alert);
+    const record = this.store.insert(alert, this.options.textRecipient || alert.phone);
     this.enqueue(alert.alert_id);
     return { record, duplicate: false };
   }
@@ -131,12 +132,13 @@ export class DeliveryService {
   }
 
   private async text(record: DeliveryRecord, body: string, key: string): Promise<boolean> {
+    const recipient = record.textRecipient ?? record.alert.phone;
     for (let attempt = 0; attempt <= this.sendDelays.length; attempt++) {
       try {
         this.store.update(record.alert.alert_id, { attempts: record.attempts + 1 });
-        const { messageId } = await this.sender.sendText(record.alert.phone, body, key);
+        const { messageId } = await this.sender.sendText(recipient, body, key);
         this.store.update(record.alert.alert_id, { messageId, error: undefined });
-        log.info("text sent", { alert_id: record.alert.alert_id, to: maskPhone(record.alert.phone), message_id: messageId });
+        log.info("text sent", { alert_id: record.alert.alert_id, to: maskPhone(recipient), message_id: messageId });
         return true;
       } catch (error) {
         this.store.update(record.alert.alert_id, { error: errorMessage(error) });

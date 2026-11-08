@@ -81,6 +81,24 @@ class CallLimitTest(unittest.IsolatedAsyncioTestCase):
             data = gateway.CallInput(key="new", phone="+12025550123", script="test")
             self.assertFalse((await gateway.create(data))["test_call"])
 
+    async def test_voice_line_is_independent_of_the_message_sender(self):
+        with patch.dict(os.environ, {"PHOTON_LINE": "+12025550000", "VOICE_PHOTON_LINE": "+12025550001",
+                                     "ALERT_PHONE": "+12025550123"}), patch.object(gateway, "enqueue"):
+            self.assertEqual(gateway.voice_line(), "+12025550001")
+            lk = AsyncMock()
+            lk.sip.list_sip_outbound_trunk.return_value.items = []
+            lk.sip.create_sip_outbound_trunk.return_value.sip_trunk_id = "voice-trunk"
+            with patch.dict(os.environ, {"PHOTON_SIP_ADDRESS": "sip.example.com:5061",
+                                         "PHOTON_SIP_USERNAME": "test", "PHOTON_SIP_PASSWORD": "test"}):
+                await gateway.trunk(lk)
+            request = lk.sip.create_sip_outbound_trunk.call_args.args[0]
+            self.assertEqual(list(request.trunk.numbers), ["+12025550001"])
+            data = gateway.CallInput(key="split-lines", phone="+12025550123", script="test", test_call=True)
+            await gateway.create(data)
+            with self.assertRaises(gateway.HTTPException) as error:
+                await gateway.create(data.model_copy(update={"phone": "+12025550001"}))
+            self.assertEqual(error.exception.detail, "Recipient cannot be the originating Photon line")
+
 
 if __name__ == "__main__":
     unittest.main()

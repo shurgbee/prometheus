@@ -1,10 +1,16 @@
-# Prometheus backend
+# Prometheus
 
 FastAPI and a separate durable worker implement Dev A's reduced hackathon MVP in [SPEC.md](SPEC.md). The Next.js frontend in `finhub/` is integrated through a same-origin server proxy. The TypeScript Photon notifier supports iMessage/SMS texts and calls through a self-hosted LiveKit SIP/audio gateway. The Brev deployment uses GPU Kokoro TTS, with an optional Riva profile; see the [deployment runbook](docs/voice-deployment.md). Without a voice gateway, call requests fall back to a CRITICAL text. No trades are executed.
 
 ## Run the integrated app
 
-With the root `.env` configured for demo mode (copy `.env.example` only if `.env` does not exist):
+Install [uv](https://docs.astral.sh/uv/) and Node.js 18.17 or newer (Node.js 20.12 or newer is required for the optional notifier). From the project root, create a demo configuration if you do not already have a root `.env`:
+
+```sh
+cp .env.example .env
+```
+
+With `DEMO_MODE=true` in the root `.env`, install dependencies and start the app:
 
 ```sh
 uv sync --python 3.13 --extra dev
@@ -76,7 +82,7 @@ All JSON and SSE routes are documented by OpenAPI. Monetary values are numbers r
 | POST | `/api/chat/{thread_id}/retry` | Resume a failed turn from its last completed graph node |
 | POST | `/api/chat/{thread_id}/resume` | SSE; `{decisions:[{proposal_id,action,spec?}]}` |
 | GET/POST/PATCH/DELETE | `/api/triggers[/{id}]` | Explicit approval required for POST/PATCH |
-| GET | `/api/triggers/{id}/evaluations?since=...` | Severity audit/sparkline, newest 500 by default returned chronologically |
+| GET | `/api/triggers/{id}/evaluations?since=...` | Severity audit/sparkline; defaults to the past day and newest 500, returned chronologically |
 | GET | `/api/alerts?status=open` | `open`, `acked`, or `all`, newest first |
 | POST | `/api/alerts/{id}/ack` | Acknowledge and stop backend retry |
 | POST | `/api/alerts/{id}/snooze?duration=24h` | Suppress further alerts for this trigger; max 30 days |
@@ -126,16 +132,18 @@ No Alpaca, NYT, FRED, Congress.gov, Steel or FT account/key is required for this
 
 ## Photon text alerts
 
-`notifier/` is a small Node service that receives alerts from the worker and texts them to `ALERT_PHONE` from your Photon iMessage line through Photon's REST API (`api.photon.codes`). It reads the same root `.env` as the backend. It needs Node 20.12 or newer.
+`notifier/` is a small Node service that receives alerts from the worker and messages `ALERT_TEXT_RECIPIENT` (or `ALERT_PHONE` when unset) through Photon's REST API (`api.photon.codes`). It reads the same root `.env` as the backend. It needs Node 20.12 or newer.
 
 ```sh
 cd notifier
 npm install
-npm run send-test        # texts ALERT_PHONE once to confirm the Photon credentials and line
+npm run send-test        # messages ALERT_TEXT_RECIPIENT or ALERT_PHONE once
 npm start                # listens on NOTIFIER_URL's port (8001 by default)
 ```
 
-**Shared iMessage lines only text people who have texted the line first.** Before the first alert, send any message to your Photon line from `ALERT_PHONE`. Photon assigns whichever handle iMessage sends from (your phone number or your Apple ID email), and `ALERT_PHONE` must match it. `npm run photon-doctor` shows your line, assignments and conversations. Otherwise sends fail with `SHARED_LINE_INBOUND_REQUIRED`. Dedicated lines don't have this limit. If the project has several lines, set `PHOTON_LINE` to the one to send from.
+**Shared iMessage lines only text people who have texted the line first.** Before the first alert, send any message to your Photon line from the intended message recipient. Photon assigns whichever handle iMessage sends from (your phone number or your Apple ID email), and `ALERT_TEXT_RECIPIENT` (or `ALERT_PHONE` when unset) must match it. `npm run photon-doctor` shows your line, assignments and conversations. Otherwise sends fail with `SHARED_LINE_INBOUND_REQUIRED`. Dedicated lines don't have this limit. If the project has several lines, set `PHOTON_LINE` to the one to send from.
+
+To use iMessage for alerts and a different number for calls, set `PHOTON_PLATFORM=imessage`, `PHOTON_LINE` to the message sender, `ALERT_TEXT_RECIPIENT` to the assigned iMessage handle, `VOICE_PHOTON_LINE` to the voice caller ID and `ALERT_PHONE` to the call recipient. Set `VOICE_GATEWAY_URL` to the reachable voice gateway. Call details and fallback messages also use iMessage; the notifier persists each accepted message destination across retries. See the [voice deployment guide](docs/voice-deployment.md) for the local and remote notifier options.
 
 `scripts/dev.py` starts the notifier automatically in live mode (`DEMO_MODE=false`) when `NOTIFIER_URL` points at `127.0.0.1` or `localhost`; pass `--no-notifier` to run it yourself. Set `PHOTON_DRY_RUN=true` to log texts instead of sending them.
 
@@ -149,7 +157,7 @@ http://localhost:3000/?alert=uuid
 
 Behaviour:
 
-- Accepted alerts are written to `notifier/data/deliveries.json` before the notifier replies, so a retried `/notify` with the same alert ID is never texted twice, even across restarts. Unfinished sends resume on startup.
+- Accepted alerts are written to `notifier/data/deliveries.json` before the notifier replies; duplicate `/notify` requests are deduplicated by alert ID, and unfinished sends resume on startup. The Photon API sender also supplies a stable idempotency key for text retries. The Spectrum sender does not supply one, so a crash or lost response around a send can result in a duplicate text.
 - Photon sends are tried three times. The outcome is reported back to the backend as `sent`, `failed`, or `text_fallback` (a requested call that was sent as a text).
 - Photon errors that a retry can't fix (bad key, line not texted first) fail immediately with an explanation in the notifier log.
 - `GET /healthz` reports the mode: `photon_api`, `spectrum` (if you set `SPECTRUM_PROJECT_ID`/`SPECTRUM_PROJECT_SECRET` instead of the Photon key) or `dry_run`.

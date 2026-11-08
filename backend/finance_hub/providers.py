@@ -192,8 +192,9 @@ class Providers:
         base = getattr(self.settings, f"{role}_base_url")
         key = getattr(self.settings, f"{role}_api_key") or self.settings.nvidia_api_key
         body = {"model": getattr(self.settings, f"{role}_model"), "temperature": 0.2,
-                "max_tokens": 4096, "messages": [{"role": "system", "content": system},
-                                                 {"role": "user", "content": json.dumps(payload, default=str)}]}
+                "max_tokens": 32768 if role == "super" else 4096,
+                "messages": [{"role": "system", "content": system},
+                             {"role": "user", "content": json.dumps(payload, default=str)}]}
         return base.rstrip("/") + "/chat/completions", body, {"Authorization": f"Bearer {key}"}
 
     async def chat_stream(self, role, system, payload):

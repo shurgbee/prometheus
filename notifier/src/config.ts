@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { normalizeHandle } from "./photon.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const ROOT = resolve(here, "../..");
@@ -45,6 +46,8 @@ export interface NotifierConfig {
   photonProjectId: string;
   photonApiKey: string;
   photonPlatform?: "imessage" | "sms";
+  /** Optional message destination; calls continue using the alert's phone. */
+  textRecipient?: string;
   voiceGatewayUrl?: string;
   voiceRetryDelayMs?: number;
   /** Optional: the line's phone number, when the project has several iMessage lines. */
@@ -77,6 +80,7 @@ export function loadConfig(): NotifierConfig {
     photonProjectId,
     photonApiKey,
     photonPlatform: (env("PHOTON_PLATFORM") || "imessage") as "imessage" | "sms",
+    textRecipient: env("ALERT_TEXT_RECIPIENT") || undefined,
     voiceGatewayUrl: env("VOICE_GATEWAY_URL").replace(/\/+$/, ""),
     voiceRetryDelayMs: Number(env("VOICE_RETRY_DELAY_MS") || 120_000),
     photonLine: env("PHOTON_LINE"),
@@ -101,6 +105,13 @@ export function loadConfig(): NotifierConfig {
   }
   if (!Number.isInteger(config.port) || config.port <= 0) throw new Error("NOTIFIER_PORT must be a port number");
   if (!["sms", "imessage"].includes(config.photonPlatform!)) throw new Error("PHOTON_PLATFORM must be sms or imessage");
+  if (config.textRecipient) {
+    config.textRecipient = normalizeHandle(config.textRecipient);
+    if (!config.textRecipient) throw new Error("ALERT_TEXT_RECIPIENT must be an E.164 number or Apple ID email");
+    if (config.photonPlatform === "sms" && !config.textRecipient.startsWith("+")) {
+      throw new Error("SMS requires an E.164 ALERT_TEXT_RECIPIENT");
+    }
+  }
   if (!Number.isFinite(config.voiceRetryDelayMs) || config.voiceRetryDelayMs! < 0) throw new Error("Invalid VOICE_RETRY_DELAY_MS");
   return config;
 }

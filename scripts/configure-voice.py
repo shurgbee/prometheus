@@ -31,11 +31,12 @@ with httpx.Client(base_url="https://api.photon.codes/v1/projects/" + config["PHO
                   headers=headers, timeout=30) as client:
     resources = check(client.get("/platforms/resources", params={"pageSize": 100}))["resources"]
     lines = [r for r in resources if "pstn_voice" in r["abilities"] and "sms" in r["abilities"]]
-    selected = config.get("PHOTON_LINE") or saved.get("PHOTON_LINE")
+    selected = (config.get("VOICE_PHOTON_LINE") or saved.get("VOICE_PHOTON_LINE")
+                or saved.get("PHOTON_LINE") or config.get("PHOTON_LINE"))
     if selected:
         lines = [r for r in lines if r["detail"].get("phoneNumber") == selected]
     if len(lines) != 1:
-        raise RuntimeError("Set PHOTON_LINE to select exactly one SMS/voice line")
+        raise RuntimeError("Set VOICE_PHOTON_LINE to select exactly one voice line")
     line = lines[0]
     sender = check(client.post("/users", json={"platform": "sms", "handle": line["detail"]["phoneNumber"]}))
     if sender.get("kind") != "agent":
@@ -64,11 +65,17 @@ with httpx.Client(base_url="https://api.photon.codes/v1/projects/" + config["PHO
         raise RuntimeError("Photon profile has no TLS connection")
     endpoint = endpoints[0]
 
+text_platform = config.get("PHOTON_PLATFORM") or "imessage"
+text_line = config.get("PHOTON_LINE") or (line["detail"]["phoneNumber"] if text_platform == "sms" else "")
+text_sender = config.get("PHOTON_SENDER_ID") or (
+    sender["id"] if text_platform == "sms" and text_line == line["detail"]["phoneNumber"] else "")
 settings = {
     **saved,
     "PHOTON_PROJECT_ID": config["PHOTON_PROJECT_ID"], "PHOTON_API_KEY": config["PHOTON_API_KEY"],
-    "PHOTON_PLATFORM": "sms", "PHOTON_LINE": line["detail"]["phoneNumber"],
-    "PHOTON_SENDER_ID": sender["id"],
+    "PHOTON_PLATFORM": text_platform, "PHOTON_LINE": text_line,
+    "PHOTON_SENDER_ID": text_sender,
+    "ALERT_TEXT_RECIPIENT": config.get("ALERT_TEXT_RECIPIENT") or "",
+    "VOICE_PHOTON_LINE": line["detail"]["phoneNumber"],
     "PHOTON_VOICE_PROFILE_ID": profile["profileId"],
     "PHOTON_SIP_ADDRESS": f"{endpoint['host']}:{endpoint['port']}",
     "PHOTON_SIP_USERNAME": outbound["authentication"]["username"], "PHOTON_SIP_PASSWORD": password,
@@ -89,4 +96,4 @@ with os.fdopen(fd, "w") as file:
     for key, value in settings.items():
         file.write(f"{key}={json.dumps(value)}\n")
 print("Configured Photon outbound SIP; wrote .env.voice (credentials not printed).")
-print("Caller ID ends in", settings["PHOTON_LINE"][-4:], "recipient ends in", settings["ALERT_PHONE"][-4:])
+print("Caller ID ends in", settings["VOICE_PHOTON_LINE"][-4:], "recipient ends in", settings["ALERT_PHONE"][-4:])
