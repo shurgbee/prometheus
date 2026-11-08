@@ -1,0 +1,10 @@
+{
+  "trigger_id": "REPLACE_WITH_A_DIFFERENT_APPROVED_TRIGGER_ID",
+  "source": "sec_edgar",
+  "external_id": "demo-sec-action-1",
+  "title": "DEMO: synthetic SEC action and an 8% TSLA decline; not a real event",
+  "url": "https://www.sec.gov/edgar/search/",
+  "magnitude": 1,
+  "urgency": 1,
+  "adjustment": 0
+}

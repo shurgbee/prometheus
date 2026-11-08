@@ -1,0 +1,10 @@
+{
+  "trigger_id": "REPLACE_WITH_FIRST_APPROVED_TRIGGER_ID",
+  "source": "nhtsa",
+  "external_id": "demo-minor-recall-1",
+  "title": "DEMO: minor recall, no immediate material impact asserted",
+  "url": "https://www.nhtsa.gov/recalls",
+  "magnitude": 0.4,
+  "urgency": 0.2,
+  "adjustment": 0
+}

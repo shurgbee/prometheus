@@ -1,0 +1,15 @@
+{
+  "holdings": [
+    {"asset_class": "cash", "name": "Demo cash", "principal": 30000},
+    {"asset_class": "cd", "name": "Demo six-month CD", "principal": 10000, "apy": 0.04, "start_date": "2026-11-01", "maturity_date": "2027-05-01"},
+    {"asset_class": "cd", "name": "Demo one-year CD", "principal": 10000, "apy": 0.045, "start_date": "2026-11-01", "maturity_date": "2027-11-01"},
+    {"asset_class": "stock", "name": "Tesla", "ticker": "TSLA", "quantity": 16, "cost_basis": 3500},
+    {"asset_class": "stock", "name": "Apple", "ticker": "AAPL", "quantity": 50, "cost_basis": 9000},
+    {"asset_class": "stock", "name": "Microsoft", "ticker": "MSFT", "quantity": 25, "cost_basis": 9500},
+    {"asset_class": "stock", "name": "NVIDIA", "ticker": "NVDA", "quantity": 75, "cost_basis": 9000},
+    {"asset_class": "stock", "name": "Alphabet", "ticker": "GOOGL", "quantity": 40, "cost_basis": 6500},
+    {"asset_class": "stock", "name": "Amazon", "ticker": "AMZN", "quantity": 40, "cost_basis": 7500}
+  ],
+  "snapshots": [],
+  "demo_report_topics": ["EV policy subsidies and incentives", "US auto market and EV adoption"]
+}
