@@ -32,9 +32,11 @@ Riva's image remains downloaded and pinned, but its model download rejected the 
 
 Local `.env.voice` and remote `.env` contain generated credentials and must remain private. They are excluded from Git and Docker build contexts. Keep a secure backup of the SIP password: Photon does not reveal an existing password on ordinary GET requests.
 
-`ALERT_PHONE` is the recipient, not the Photon number. The configuration script resolves the SMS agent identity automatically and saves it as `PHOTON_SENDER_ID`. SMS user and space routing uses `PHOTON_PLATFORM=sms`.
+`ALERT_PHONE` is the call recipient in E.164 format. `ALERT_TEXT_RECIPIENT` optionally selects a separate message destination, such as the Apple ID email assigned to a shared iMessage line. It defaults to the alert's phone. Normal alerts, call details and fallback messages all use this destination; accepted deliveries persist it so configuration changes cannot redirect retries.
 
-The original app `.env` now has the separate recipient you provided. The app still uses `NOTIFIER_URL=http://127.0.0.1:8001`; the SSH tunnel below forwards this to the VPS. The VPS sends backend callbacks to `http://127.0.0.1:18000`, reverse-forwarded to the workstation's backend port 8000.
+For iMessage plus voice, use `PHOTON_PLATFORM=imessage` and `PHOTON_LINE` for the iMessage sender, and `VOICE_PHOTON_LINE` for the voice caller ID. The shared iMessage recipient must have an active assignment and have messaged the line first. SMS campaigns are only relevant when selecting the SMS messaging channel. The voice gateway keeps its separate SIP configuration. The configuration script preserves both senders in `.env.voice`; legacy voice deployments fall back to `PHOTON_LINE` when `VOICE_PHOTON_LINE` is absent.
+
+For the local app, run a local notifier on an unused port (currently `NOTIFIER_URL=http://127.0.0.1:8003`) and set `VOICE_GATEWAY_URL=http://127.0.0.1:8002`. The SSH tunnel below forwards the voice gateway to the VPS. Alternatively, use the VPS notifier through forwarded port 8001 after deploying the same messaging configuration. The VPS sends backend callbacks to `http://127.0.0.1:18000`, reverse-forwarded to the workstation's backend port 8000.
 
 The local app reads `DATABASE_URL` from this checkout's root `.env`. A URL saved only in `/home/shadeform/prometheus/.env` on the VPS does not configure the local app. Tiger's URL must include its database password, for example `postgresql://tsdbadmin:PASSWORD@HOST:PORT/tsdb?sslmode=require`; percent-encode special characters in the password. The development launcher now checks connectivity before starting children and reports a single actionable login error without printing the connection string.
 
@@ -42,7 +44,7 @@ The local app reads `DATABASE_URL` from this checkout's root `.env`. A URL saved
 
 Prerequisites: an existing Brev SSH alias, Docker Compose and working NVIDIA Container Toolkit on the host. Allow at least 60 GB free root-disk space for image extraction/builds plus a separate model cache; the supplied A100 host has a large `/ephemeral` disk. The bootstrap keeps control APIs private and opens only the configured call media range in UFW. The cloud/provider firewall must also permit that media traffic.
 
-1. Put the existing Photon v2 project ID/key, notifier token and recipient in local `.env`. The key needs Users, Spaces, Messages and Platforms read/write permissions. Configure the line's SMS campaign separately in Photon.
+1. Put the existing Photon v2 project ID/key, notifier token and recipients in local `.env`. The key needs Users, Spaces, Messages and Platforms read/write permissions. Select the messaging platform and sender separately from `VOICE_PHOTON_LINE`. Configure an SMS campaign only if using the SMS messaging channel.
 
 2. Generate/reuse the private Voice settings on the workstation:
 
@@ -50,7 +52,7 @@ Prerequisites: an existing Brev SSH alias, Docker Compose and working NVIDIA Con
    .venv/bin/python scripts/configure-voice.py
    ```
 
-   This enables outbound SIP only if absent, saves its returned password, and never silently rotates existing credentials. If there are several eligible lines, set `PHOTON_LINE` explicitly. The default is `COMPOSE_PROFILES=kokoro`. On a fresh workstation with outbound already enabled, restore the existing `.env.voice` backup or supply its SIP password before rerunning; do not rotate credentials unnecessarily.
+   This enables outbound SIP only if absent, saves its returned password, and never silently rotates existing credentials. If there are several eligible voice lines, set `VOICE_PHOTON_LINE` explicitly. The default is `COMPOSE_PROFILES=kokoro`. On a fresh workstation with outbound already enabled, restore the existing `.env.voice` backup or supply its SIP password before rerunning; do not rotate credentials unnecessarily.
 
 3. Upload/build/start from the workstation:
 
@@ -72,10 +74,10 @@ Prerequisites: an existing Brev SSH alias, Docker Compose and working NVIDIA Con
 
    ```sh
    bash scripts/voice-tunnel.sh
-   uv run python scripts/dev.py --no-notifier
+   uv run python scripts/dev.py
    ```
 
-   Install the app's usual frontend/backend dependencies first if needed. `--no-notifier` prevents starting another local notifier on the forwarded port. Keep `DEMO_MODE=false` for real delivery. The backend code in this checkout includes the notifier-authenticated retry-state endpoint; an older backend will not support cancellation checks. The tunnel reconnects the transport, not the app; it does not start the frontend/backend or worker.
+   Install the app's usual frontend/backend dependencies first if needed. This starts the local notifier using the root `.env`. If choosing the remote notifier on forwarded port 8001 instead, pass `--no-notifier`. Keep `DEMO_MODE=false` for real delivery. The backend code in this checkout includes the notifier-authenticated retry-state endpoint; an older backend will not support cancellation checks. The tunnel reconnects the transport, not the app; it does not start the frontend/backend or worker.
 
 5. Check speech and optionally place a call:
 
@@ -84,7 +86,7 @@ Prerequisites: an existing Brev SSH alias, Docker Compose and working NVIDIA Con
    .venv/bin/python scripts/voice-smoke.py --call
    ```
 
-   `--call` creates a real phone call and attempts a real SMS to `ALERT_PHONE`. It explicitly sets `test_call: true`, so it does not consume or enforce the daily alert-call allowance. A new ID creates a new test alert. To verify duplicate handling without another call, reuse the completed test ID:
+   `--call` creates a real phone call to `ALERT_PHONE` and sends details to `ALERT_TEXT_RECIPIENT` (or the phone when unset) through the selected messaging channel. It uses the root `.env`'s `NOTIFIER_URL`, defaulting to forwarded port 8001. It explicitly sets `test_call: true`, so it does not consume or enforce the daily alert-call allowance. A new ID creates a new test alert. To verify duplicate handling without another call, reuse the completed test ID:
 
    ```sh
    .venv/bin/python scripts/voice-smoke.py --call --alert-id voice-setup-20261108-1

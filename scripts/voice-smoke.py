@@ -10,11 +10,12 @@ from dotenv import dotenv_values
 import httpx
 
 parser = argparse.ArgumentParser(description=__doc__)
-parser.add_argument("--call", action="store_true", help="Call ALERT_PHONE and attempt a real detail SMS")
+parser.add_argument("--call", action="store_true", help="Call ALERT_PHONE and send details through the configured message channel")
 parser.add_argument("--alert-id", help="Reuse an ID to check notifier idempotency without another call")
 args = parser.parse_args()
 root = Path(__file__).resolve().parents[1]
 config = dotenv_values(root / ".env.voice")
+notifier_url = (dotenv_values(root / ".env").get("NOTIFIER_URL") or "http://127.0.0.1:8001").rstrip("/")
 headers = {"Authorization": "Bearer " + config["NOTIFIER_TOKEN"]}
 with httpx.Client(timeout=45, headers=headers) as client:
     health = client.get("http://127.0.0.1:8002/healthz")
@@ -41,7 +42,7 @@ with httpx.Client(timeout=45, headers=headers) as client:
             "title": "Voice service test", "summary": "This is a test. Your self hosted calling service is ready. "
             "No financial event triggered this alert.", "url": config.get("DASHBOARD_URL", ""),
             "channel": "call", "severity": 80, "test_call": True}
-        response = client.post("http://127.0.0.1:8001/notify", json=payload,
+        response = client.post(notifier_url + "/notify", json=payload,
                                headers={"Idempotency-Key": alert_id})
         response.raise_for_status()
         print("Notifier:", response.json())

@@ -19,6 +19,8 @@ export interface AlertPayload {
 
 export interface DeliveryRecord {
   alert: AlertPayload;
+  /** Resolved when accepted so retries cannot redirect after a configuration change. */
+  textRecipient?: string;
   status: SendStatus;
   attempts: number;
   messageId?: string;
@@ -62,9 +64,9 @@ export class DeliveryStore {
     return [...this.records.values()];
   }
 
-  insert(alert: AlertPayload): DeliveryRecord {
+  insert(alert: AlertPayload, textRecipient = alert.phone): DeliveryRecord {
     const stamp = new Date().toISOString();
-    const record: DeliveryRecord = { alert, status: "queued", attempts: 0, callbackDone: false,
+    const record: DeliveryRecord = { alert, textRecipient, status: "queued", attempts: 0, callbackDone: false,
       createdAt: stamp, updatedAt: stamp };
     this.records.set(alert.alert_id, record);
     this.flush();

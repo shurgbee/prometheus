@@ -88,6 +88,7 @@ export function createNotifier(config: NotifierConfig, sender: TextSender = crea
     voice: !config.dryRun && config.voiceGatewayUrl
       ? new GatewayVoiceSender(config.voiceGatewayUrl, config.notifierToken) : undefined,
     voiceRetryDelayMs: config.voiceRetryDelayMs,
+    textRecipient: config.textRecipient,
     ...overrides,
   });
 

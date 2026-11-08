@@ -78,6 +78,59 @@ test("a requested call falls back to a CRITICAL text", async () => {
   assert.deepEqual(backend.calls[0].body, { status: "text_fallback" });
 });
 
+test("normal alerts, call details and call fallback use the separate message recipient", async () => {
+  const sender = new FakeSender();
+  const backend = fakeBackend();
+  const calls: string[] = [];
+  const textRecipient = "alerts@example.com";
+  const { deliveries, store } = createNotifier({ ...baseConfig, dryRun: false,
+    storePath: tempStore(), textRecipient }, sender, {
+    fetchImpl: backend.fetchImpl,
+    voice: { async call(payload) { calls.push(payload.phone); return "completed"; } },
+  });
+  deliveries.accept(alert());
+  deliveries.accept(alert({ alert_id: "call", channel: "call", level: "Critical" }));
+  await deliveries.idle();
+  deliveries.stop();
+  assert.deepEqual(calls, ["+15555550123"]);
+  assert.equal(sender.sent.length, 2);
+  assert.ok(sender.sent.every((message) => message.phone === textRecipient));
+  assert.equal(store.get("call")!.alert.phone, "+15555550123");
+  assert.equal(store.get("call")!.textRecipient, textRecipient);
+
+  const fallback = createNotifier({ ...baseConfig, storePath: tempStore(), textRecipient }, sender,
+    { fetchImpl: backend.fetchImpl });
+  fallback.deliveries.accept(alert({ alert_id: "fallback", channel: "call", level: "Critical" }));
+  await fallback.deliveries.idle();
+  fallback.deliveries.stop();
+  assert.equal(sender.sent.at(-1)!.phone, textRecipient);
+  assert.equal(fallback.store.get("fallback")!.backendStatus, "text_fallback");
+});
+
+test("a restarted missed call keeps its accepted message recipient after configuration changes", async () => {
+  const path = tempStore();
+  const sender = new FakeSender();
+  const calls: string[] = [];
+  const fetchImpl = (async () => new Response(JSON.stringify({ trigger_status: "active" }))) as typeof fetch;
+  const options = { backendUrl: "http://backend", notifierToken: TOKEN, fetchImpl, voiceRetryDelayMs: 60_000,
+    voice: { async call(payload: AlertPayload) { calls.push(payload.phone); return "missed" as const; } } };
+  const first = new DeliveryService(new DeliveryStore(path), sender,
+    { ...options, textRecipient: "original@example.com" });
+  first.accept(alert({ channel: "call", level: "Critical" }));
+  await first.idle();
+  first.stop();
+  const store = new DeliveryStore(path);
+  store.update("a1", { nextCallAt: new Date(0).toISOString() });
+  const second = new DeliveryService(store, sender, { ...options, textRecipient: "changed@example.com" });
+  second.resume();
+  await second.idle();
+  second.stop();
+  assert.deepEqual(calls, ["+15555550123", "+15555550123"]);
+  assert.equal(sender.sent.length, 2);
+  assert.ok(sender.sent.every((message) => message.phone === "original@example.com"));
+  assert.equal(store.get("a1")!.backendStatus, "text_fallback");
+});
+
 test("retries Photon failures, then reports 'failed'", async () => {
   const sender = new FakeSender();
   sender.failures = 5;

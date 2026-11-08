@@ -98,6 +98,10 @@ def client():
                          timeout=aiohttp.ClientTimeout(total=75))
 
 
+def voice_line():
+    return os.getenv("VOICE_PHOTON_LINE") or os.environ["PHOTON_LINE"]
+
+
 async def trunk(lk):
     saved = DATA / "trunk.json"
     response = await lk.sip.list_sip_outbound_trunk(api.ListSIPOutboundTrunkRequest())
@@ -106,7 +110,7 @@ async def trunk(lk):
     if found is None:
         found = await lk.sip.create_sip_outbound_trunk(api.CreateSIPOutboundTrunkRequest(
             trunk=api.SIPOutboundTrunkInfo(name=name, address=os.environ["PHOTON_SIP_ADDRESS"],
-                numbers=[os.environ["PHOTON_LINE"]], transport=api.SIP_TRANSPORT_TLS,
+                numbers=[voice_line()], transport=api.SIP_TRANSPORT_TLS,
                 auth_username=os.environ["PHOTON_SIP_USERNAME"], auth_password=os.environ["PHOTON_SIP_PASSWORD"],
                 media_encryption=api.SIP_MEDIA_ENCRYPT_ALLOW)))
     saved.write_text(json.dumps({"id": found.sip_trunk_id}))
@@ -307,7 +311,7 @@ async def render(data: RenderInput):
 
 @app.post("/calls", dependencies=[Depends(authorized)], status_code=202)
 async def create(data: CallInput):
-    if data.phone == os.environ["PHOTON_LINE"]:
+    if data.phone == voice_line():
         raise HTTPException(422, "Recipient cannot be the originating Photon line")
     if data.phone != os.environ["ALERT_PHONE"]:
         raise HTTPException(422, "Recipient must match configured ALERT_PHONE")

@@ -5,7 +5,7 @@ import { errorMessage } from "./log.ts";
 import { normalizeHandle } from "./photon.ts";
 
 const config = loadConfig();
-const phone = normalizeHandle(process.env.ALERT_PHONE ?? "");
+const phone = normalizeHandle(config.textRecipient || process.env.ALERT_PHONE || "");
 const base = `${config.photonApiUrl}/v1/projects/${encodeURIComponent(config.photonProjectId)}`;
 const platform = config.photonPlatform ?? "imessage";
 
@@ -43,9 +43,9 @@ await section("Lines and numbers", "/platforms/resources?pageSize=50");
 if (platform === "imessage") await section("iMessage assignments", "/platforms/imessage/assignments?pageSize=50");
 const users = await section(`${platform} users`, `/users?platform=${platform}&pageSize=50`);
 const me = (users?.items ?? []).find((u: any) => normalizeHandle(String(u.handle)) === phone);
-if (me?.kind === "agent") console.log("\n!! ALERT_PHONE is the Photon line itself. Set it to the phone or Apple ID you text the line from.");
+if (me?.kind === "agent") console.log("\n!! The message recipient is the Photon line itself. Set ALERT_TEXT_RECIPIENT to the phone or Apple ID you text the line from.");
 if (me) {
-  await section("Conversations with ALERT_PHONE", `/spaces?platform=${platform}&participantId=${me.id}&pageSize=20`);
+  await section("Conversations with message recipient", `/spaces?platform=${platform}&participantId=${me.id}&pageSize=20`);
 } else {
-  console.log(`\nALERT_PHONE is not among the project's ${platform} users yet.`);
+  console.log(`\nThe configured message recipient is not among the project's ${platform} users yet.`);
 }
