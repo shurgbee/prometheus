@@ -28,13 +28,13 @@ export function RecentReports() {
           <Skeleton className="h-14 w-full" />
         </div>
       ) : !reports.length ? (
-        <EmptyState>No reports yet. Ask the advisor to research a topic and the report lands here.</EmptyState>
+        <EmptyState>No reports yet.</EmptyState>
       ) : (
-        <ul className="divide-y divide-line border-y border-line">
+        <ul className="divide-y divide-line overflow-hidden rounded-lg border border-edge bg-surface [&>li]:px-4">
           {reports.map((r) => (
             <li key={r.id}>
               <Link href={`/reports/${encodeURIComponent(r.id)}`} className="group block py-3">
-                <p className="font-serif text-lg leading-snug text-ink group-hover:text-accent">{r.title}</p>
+                <p className="font-display font-semibold text-lg leading-snug text-ink group-hover:text-accent">{r.title}</p>
                 <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-ink-3">
                   <span>{relativeTime(r.created_at)}</span>
                   {r.tickers.slice(0, 3).map((t) => (

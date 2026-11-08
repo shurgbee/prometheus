@@ -11,7 +11,9 @@ __pycache__/
 *.sqlite*
 *.egg-info/
 dist/
-
+*node_modules*
 .playwright-mcp/
 notifier/node_modules/
 notifier/data/
+.claude/
+.DS_Store

@@ -19,7 +19,7 @@ export function ResearchNotice({ jobId, topic }: { jobId: string; topic: string 
   }, [status]);
 
   return (
-    <div className="flex items-start gap-3 rounded border border-line bg-plane/50 px-3 py-2.5">
+    <div className="flex items-start gap-3 rounded border border-line bg-plane px-3 py-2.5">
       <span className="mt-0.5 text-ink-3">
         {status === "done" ? (
           <FileText size={15} aria-hidden />

@@ -4,18 +4,21 @@
 
 :root {
   color-scheme: dark;
+  --edge: #2a2a2b; /* Outer border of foreground elements, blending into the page. */
+}
+
+@layer utilities {
+  .border-edge {
+    border-color: var(--edge);
+  }
 }
 
 @layer base {
   html {
-    background-color: theme("colors.plane");
+    background-color: #000;
   }
   body {
-    @apply bg-plane font-sans text-base text-ink antialiased;
-    /* Faint dot grid on the page plane only. */
-    background-image: radial-gradient(rgba(237, 233, 228, 0.055) 1px, transparent 1px);
-    background-size: 22px 22px;
-    background-attachment: fixed;
+    @apply font-sans text-base text-ink antialiased;
   }
   ::selection {
     background: rgba(127, 166, 245, 0.35);
@@ -42,12 +45,9 @@
   .num {
     font-variant-numeric: tabular-nums;
   }
-  .hairline-dashed {
-    border-style: dashed;
-    border-color: theme("colors.line-strong");
-  }
   .panel {
-    @apply rounded-lg border border-line bg-surface;
+    @apply rounded-lg border bg-surface;
+    border-color: var(--edge);
   }
   .btn {
     @apply inline-flex items-center justify-center gap-1.5 rounded-pill px-3.5 py-1.5 text-sm font-medium transition-colors disabled:opacity-50;
@@ -56,7 +56,8 @@
     @apply btn bg-accent text-accent-ink hover:bg-[#9ab9f8];
   }
   .btn-ghost {
-    @apply btn border border-line-strong text-ink-2 hover:bg-raised hover:text-ink;
+    @apply btn border bg-surface text-ink-2 hover:bg-raised hover:text-ink;
+    border-color: var(--edge);
   }
   .btn-quiet {
     @apply btn px-2.5 text-ink-2 hover:bg-raised hover:text-ink;
@@ -65,7 +66,7 @@
     @apply w-full rounded border border-line-strong bg-raised px-3 py-2 text-sm text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none;
   }
   .section-title {
-    @apply font-serif text-2xl font-normal text-ink;
+    @apply font-display font-semibold text-3xl text-ink;
   }
   .label {
     @apply text-xs text-ink-3;
@@ -77,13 +78,17 @@
   @apply text-ink-2;
   line-height: 1.65;
 }
+.prose-fin.chat-prose,
+.prose-fin.chat-prose blockquote {
+  @apply text-ink;
+}
 .prose-fin > * + * {
   margin-top: 0.75em;
 }
 .prose-fin h1,
 .prose-fin h2,
 .prose-fin h3 {
-  @apply font-serif font-normal text-ink;
+  @apply font-display font-semibold text-ink;
   margin-top: 1.4em;
 }
 .prose-fin h1 {
@@ -100,6 +105,9 @@
 }
 .prose-fin a {
   @apply text-accent underline decoration-accent/40 underline-offset-2 hover:decoration-accent;
+}
+.prose-fin a.citation {
+  @apply ml-1 inline-block rounded-sm bg-raised px-1.5 text-2xs font-medium text-accent no-underline hover:bg-overlay;
 }
 .prose-fin ul {
   list-style: disc;

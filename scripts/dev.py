@@ -13,6 +13,33 @@ from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# Reads child process-group IDs on stdin. EOF without "done" means this launcher died without
+# cleaning up (for example SIGKILL), so the children, each in its own session, must be stopped here.
+WATCHDOG = """
+import os, signal, sys, time
+for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+    signal.signal(sig, signal.SIG_IGN)
+groups = []
+for line in sys.stdin:
+    if line.strip() == "done":
+        sys.exit()
+    groups.append(int(line))
+def signal_groups(sig):
+    alive = False
+    for group in groups:
+        try:
+            os.killpg(group, sig)
+            alive = True
+        except (ProcessLookupError, PermissionError):
+            pass
+    return alive
+signal_groups(signal.SIGTERM)
+deadline = time.monotonic() + 5
+while time.monotonic() < deadline and signal_groups(0):
+    time.sleep(.1)
+signal_groups(signal.SIGKILL)
+"""
+
 
 async def preflight_database(settings):
     """Check once before spawning children so a bad credential has one actionable error."""
@@ -94,10 +121,14 @@ def main():
     def stop(*_):
         raise KeyboardInterrupt
     signal.signal(signal.SIGTERM, stop)
+    watchdog = subprocess.Popen([sys.executable, "-I", "-c", WATCHDOG], stdin=subprocess.PIPE, text=True,
+                                start_new_session=True)
     try:
         for command, cwd in commands:
             children.append(subprocess.Popen(command, cwd=cwd, env=env, start_new_session=True))
-        print(f"Finance Hub: http://127.0.0.1:{args.web_port} ({'demo' if settings.demo_mode else 'live'})", flush=True)
+            watchdog.stdin.write(f"{children[-1].pid}\n")
+            watchdog.stdin.flush()
+        print(f"Prometheus: http://127.0.0.1:{args.web_port} ({'demo' if settings.demo_mode else 'live'})", flush=True)
         while all(child.poll() is None for child in children):
             time.sleep(.5)
         failed = next(child for child in children if child.poll() is not None)
@@ -105,6 +136,9 @@ def main():
     except KeyboardInterrupt:
         pass
     finally:
+        # A repeated stop signal must not abort cleanup and strand the children.
+        signal.signal(signal.SIGTERM, signal.SIG_IGN)
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
         for child in children:
             if child.poll() is None:
                 os.killpg(child.pid, signal.SIGTERM)
@@ -114,6 +148,9 @@ def main():
             except subprocess.TimeoutExpired:
                 os.killpg(child.pid, signal.SIGKILL)
                 child.wait()
+        watchdog.stdin.write("done\n")
+        watchdog.stdin.close()
+        watchdog.wait()
 
 
 if __name__ == "__main__":

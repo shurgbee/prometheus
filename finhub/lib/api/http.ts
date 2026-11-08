@@ -55,7 +55,7 @@ export function normalizeTrigger(raw: BackendTrigger): Trigger {
   return { ...raw.spec, id: raw.id, status: raw.status, created_at: raw.created_at,
     pinned: raw.spec.pinned ?? false, last_checked_at: raw.last_checked_at,
     last_level: raw.last_checked_at ? raw.level.toLowerCase() as Trigger["last_level"] : null,
-    last_severity: raw.last_severity ?? null };
+    last_severity: raw.last_severity ?? null, latest_price: raw.latest_price ?? null, event_state: raw.event_state ?? null };
 }
 export function normalizeEvaluation(raw: BackendEvaluation): Evaluation {
   return { ...raw, exposure: Math.min(raw.exposure / .1, 1), level: raw.level.toLowerCase() as Evaluation["level"] };
@@ -89,12 +89,12 @@ async function* stream(path: string, body?: unknown, signal?: AbortSignal): Asyn
       }
       case "tool": {
         yield { type: "tool", id: "turn-context", name: "Portfolio and research tools", status: "done" };
-        const data = frame.data as { news?: import("./types").ChatSource[]; research_job?: BackendJob } | undefined;
-        if (data?.news?.length) yield { type: "sources", items: data.news };
+        const data = frame.data as { cited_sources?: import("./types").ChatSource[]; research_job?: BackendJob } | undefined;
+        if (data?.cited_sources?.length) yield { type: "sources", items: data.cited_sources };
         if (data?.research_job) yield { type: "research", job_id: data.research_job.id, topic: data.research_job.topic };
         break;
       }
-      // `answer` is the full text already emitted as token chunks; don't duplicate it.
+      case "answer": yield { type: "answer", text: frame.text as string }; break;
     }
   }
 }

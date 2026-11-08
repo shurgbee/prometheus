@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { HistoryRange, NetWorthPoint } from "@/lib/api";
 import { useNetWorthHistory } from "@/lib/hooks";
-import { money, shortDate, signedMoney, signedPct } from "@/lib/format";
+import { money, shortDate } from "@/lib/format";
 import { ErrorNote, Segmented, Skeleton, SectionHeader } from "@/components/ui";
 
 const RANGES: { value: HistoryRange; label: string }[] = [
@@ -31,23 +31,12 @@ export function NetWorthHistory() {
   const points = useMemo(() => [...(data?.points ?? [])].sort((a, b) => a.ts.localeCompare(b.ts)), [data]);
   const first = points[0];
   const last = points[points.length - 1];
-  const change = first && last ? last.total - first.total : null;
-  const changePct = first && last && first.total ? (last.total - first.total) / first.total : null;
 
   return (
-    <section aria-labelledby="history-title">
+    <section aria-labelledby="history-title" className="rounded-lg border border-edge bg-surface p-5 sm:p-6">
       <SectionHeader
         id="history-title"
         title="Net worth over time"
-        description={
-          change != null ? (
-            <>
-              {signedMoney(change)} ({signedPct(changePct)}) over this period
-            </>
-          ) : (
-            "Daily snapshots"
-          )
-        }
         action={<Segmented label="Time range" options={RANGES} value={range} onChange={setRange} />}
       />
       {error && !data ? (
@@ -55,7 +44,7 @@ export function NetWorthHistory() {
       ) : isLoading && !data ? (
         <Skeleton className="h-[200px] w-full" />
       ) : points.length < 2 ? (
-        <p className="text-sm text-ink-3">Not enough snapshots yet. A point is saved each day after the close.</p>
+        <p className="text-sm text-ink-3">Not enough data yet.</p>
       ) : (
         <div className="h-[200px] w-full" role="img" aria-label={`Net worth from ${shortDate(first?.ts)} to ${shortDate(last?.ts)}`}>
           <ResponsiveContainer width="100%" height="100%">

@@ -1,7 +1,7 @@
-Personal Finance Hub — Product Spec (Hackathon MVP)
+Prometheus — Product Spec (Hackathon MVP)
 
 Overview
-Finance Hub is a single-user hackathon MVP with two parts. A dashboard shows net worth, allocation and live triggers. An advisor chat, built on Nemotron, turns everyday observations into research reports and watch triggers. Alerts go out by iMessage text when they are normal and by phone call when they are critical.
+Prometheus is a single-user hackathon MVP with two parts. A dashboard shows net worth, allocation and live triggers. An advisor chat, built on Nemotron, turns everyday observations into research reports and watch triggers. Alerts go out by iMessage text when they are normal and by phone call when they are critical.
 
 Decisions locked for the MVP
 
@@ -20,7 +20,7 @@ Non-goals
 Trade execution or brokerage connections.
 Account aggregation such as Plaid.
 Multi-user accounts, tax planning and retirement modelling.
-Claims of personalised investment advice. Every agent answer carries an "educational, not financial advice" note.
+Claims of personalised investment advice. The chat panel always shows an "educational, not financial advice" note, and every report carries one.
 Demo success criteria
 
 The Tesla question goes end to end (answer, then triggers accepted, then report requested) in under 3 minutes.
@@ -65,7 +65,7 @@ Here P is principal and d is days since purchase. Cash is entered as a balance. 
 The page also has a holdings editor (form plus CSV import with columns asset_class, name, ticker, quantity, cost_basis, principal, apy, start_date, maturity_date) and a chat panel docked on the right, so a trigger approved in chat appears in the triggers widget straight away.
 
 Advisor chat agent
-The advisor is a LangGraph StateGraph. A Nemotron 3 Nano router sends each turn to one of four intents, and a Nemotron 3 Super tool-calling agent writes the answer. Creating a trigger always pauses the graph with an interrupt until the user approves.
+The advisor is a LangGraph StateGraph. A Nemotron 3.5 Lightning router sends each turn to one of four intents, and a Nemotron 3.5 Super tool-calling agent writes the answer. Creating a trigger always pauses the graph with an interrupt until the user approves.
 
 Intents
 
@@ -103,7 +103,7 @@ Guardrails
 Every price, percentage or holding figure comes from a tool result in the same turn, never from the model's memory. A post-check flags numbers with no tool source.
 Factual claims carry a citation, or say plainly that they are unverified.
 No trade actions exist in the toolset. Requests to buy or sell get an explanation, not an order.
-Each answer ends with an "educational, not financial advice" note.
+The chat panel permanently shows an "educational, not financial advice" note, so individual answers do not repeat it.
 Conversation state persists through LangGraph's Postgres checkpointer in Tiger DB, so threads survive restarts.
 Research agent and report index
 The research agent is an asynchronous LangGraph subgraph that writes a cited report in about 2–5 minutes. It prefers official APIs and uses Steel Browser only for pages that have no API. Finished reports are chunked, embedded with a Nemotron embedding model and searched with vector + BM25 retrieval followed by a Nemotron reranker.
@@ -132,7 +132,7 @@ Store short excerpts, links and the agent's own synthesis, never full copies of 
 Do not bypass paywalls or log in to sources the project has no licence for. FT content needs a licence (see External data sources).
 Respect each API's rate limits. SEC EDGAR needs a descriptive User-Agent that identifies the app's operator.
 Trigger agents
-Each trigger works in two stages. First, cheap statistical detectors run on every poll. Then, only when a detector fires, a Nemotron 3 Nano triage step runs. A 0–100 severity score maps each evaluation to OK (log only), Normal alert (text) or Critical alert (call). This is how "severity decides the response" works: the response follows the score, not a single threshold.
+Each trigger works in two stages. First, cheap statistical detectors run on every poll. Then, only when a detector fires, a Nemotron 3.5 Lightning triage step runs. A 0–100 severity score maps each evaluation to OK (log only), Normal alert (text) or Critical alert (call). This is how "severity decides the response" works: the response follows the score, not a single threshold.
 
 Trigger spec (what propose_triggers drafts and the user approves)
 
@@ -217,22 +217,22 @@ trigger_evaluations Hypertable trigger_id, ts, magnitude, exposure, credibility,
 alerts Table id, trigger_id, evaluation_ts, level, severity, summary, evidence jsonb, channel, delivery_status, attempts, acked_at, snoozed_until Feeds the alert feed
 checkpoints and related LangGraph-managed thread_id, checkpoint Created by langgraph-checkpoint-postgres
 Tech stack and model selection
-Only Nemotron 3 Nano is self-hosted. At FP8 it fits on one 48 GB GPU, with the 1B embedding model beside it. Nemotron 3 Super is too big for limited hardware, so it runs on NVIDIA's free hosted endpoint and uses no Brev GPU at all.
+Only Nemotron 3.5 Lightning is self-hosted. At FP8 it fits on one 48 GB GPU, with the 1B embedding model beside it. Nemotron 3.5 Super is too big for limited hardware, so it runs on NVIDIA's free hosted endpoint and uses no Brev GPU at all.
 
 Model sizes
 
 Active parameters set speed, not memory. In a mixture-of-experts model every expert must sit in GPU memory, so Nano needs memory for about 30B parameters, not 3B (Thunder Compute).
 
 Model Total / active params Memory, BF16 Memory, FP8 Memory, 4-bit Verdict
-Nemotron 3 Nano 30B-A3B 31.6B / about 3.6B ~60 GB ~32 GB ~17 GB Self-host. One L40S 48 GB at FP8, or one 24 GB card at 4-bit
-Nemotron 3 Super 120B-A12B 120.6B / 12.7B ~240 GB ~128 GB ~64–72 GB Don't self-host. Use the free hosted endpoint
-Nemotron 3 Nano 4B 4B, dense Small Small Runs on an 8 GB Jetson Fallback for routing and triage if no 24 GB GPU is available
+Nemotron 3.5 Lightning 30B-A3B 31.6B / about 3.6B ~60 GB ~32 GB ~17 GB Self-host. One L40S 48 GB at FP8, or one 24 GB card at 4-bit
+Nemotron 3.5 Super VL 120B-A12B 120.6B / 12.7B ~240 GB ~128 GB ~64–72 GB Don't self-host. Use the free hosted endpoint
+Nemotron 3.5 Bolt E4B 4B, dense Small Small Runs on an 8 GB Jetson Fallback for routing and triage if no 24 GB GPU is available
 Nemotron 3.5 Embed 1B 1B Small Small Small Self-host beside Nano
 Memory figures are approximate and leave out the KV cache, which grows with context length. Cap context at 32K tokens on the Nano server so the cache stays small.
 
-Layer Technology Role in Finance Hub Notes
-Fast LLM Nemotron 3 Nano 30B-A3B (FP8), self-hosted NIM or vLLM Router, trigger triage, research plan and extract. Fallback for the advisor. 1M-token context available, capped at 32K here
-Reasoning LLM Nemotron 3 Super, NVIDIA hosted API (integrate.api.nvidia.com) Advisor answers, report synthesis and critique No GPU needed. Rate-limited free tier.
+Layer Technology Role in Prometheus Notes
+Fast LLM Nemotron 3.5 Lightning 30B-A3B (FP8), self-hosted NIM or vLLM Router, trigger triage, research plan and extract. Fallback for the advisor. 1M-token context available, capped at 32K here
+Reasoning LLM Nemotron 3.5 Super, NVIDIA hosted API (integrate.api.nvidia.com) Advisor answers, report synthesis and critique No GPU needed. Rate-limited free tier.
 Embed and rerank Nemotron 3.5 Embed 1B self-hosted. Rerank through the hosted API. Report chunks, summaries, signal novelty, retrieval reranking Embed 1B returns 2048-dim vectors that can be truncated (OpenRouter)
 GPU platform NVIDIA Brev One GPU instance for Nano and embed Brev suggests an L40S 48GB or A100 80GB for NIMs
 Database Tiger Cloud (TimescaleDB, pgvector, pgvectorscale, pgai, pg_textsearch) All app data, time series, vectors, BM25, LangGraph checkpoints One service, so no separate vector DB

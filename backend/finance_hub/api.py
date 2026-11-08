@@ -21,7 +21,7 @@ from sqlalchemy import and_, select
 
 from .advisor import Advisor
 from .config import Settings
-from .db import Alert, AppEvent, Database, Evaluation, Holding, Report, ReportSource, ResearchJob
+from .db import Alert, AppEvent, Database, Evaluation, Holding, Report, ReportSource, ResearchJob, Price
 from .db import Snapshot, Trigger, aware, emit, now, row_dict
 from .portfolio import portfolio
 from .providers import ProviderError, Providers
@@ -87,7 +87,7 @@ def create_app(settings: Settings | None = None):
             await providers.close()
             await db.close()
 
-    app = FastAPI(title="Finance Hub Backend", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="Prometheus Backend", version="0.1.0", lifespan=lifespan)
     app.state.settings, app.state.db = settings, db
     app.state.providers, app.state.research, app.state.triggers = providers, research, triggers
     app.add_middleware(CORSMiddleware, allow_origins=settings.cors_origins,
@@ -195,8 +195,16 @@ def create_app(settings: Settings | None = None):
         async def run():
             try:
                 graph = app.state.advisor.graph
-                async for update in graph.astream(input_, {"configurable": {"thread_id": thread_id}},
-                                                  stream_mode="updates"):
+                streamed = False
+                async for mode, update in graph.astream(input_, {"configurable": {"thread_id": thread_id}},
+                                                        stream_mode=["updates", "custom"]):
+                    if mode == "custom":
+                        if "token" in update:
+                            streamed = True
+                            await queue.put(("token", {"text": update["token"]}))
+                        else:
+                            await queue.put(("tool", {"name": "turn_context", "data": {}}))
+                        continue
                     for node, value in update.items():
                         if node == "__interrupt__":
                             for item in value:
@@ -205,7 +213,7 @@ def create_app(settings: Settings | None = None):
                             context = value.get("context", {})
                             await queue.put(("tool", {"name": "turn_context", "data": context}))
                             answer = value["answer"]
-                            for index in range(0, len(answer), 80):
+                            for index in range(0, len(answer) if not streamed else 0, 80):
                                 await queue.put(("token", {"text": answer[index:index+80]}))
                             await queue.put(("answer", {"text": answer}))
                         elif node == "apply":
@@ -308,7 +316,16 @@ def create_app(settings: Settings | None = None):
                         .order_by(Evaluation.ts.desc()).limit(1).correlate(Trigger).scalar_subquery())
             rows = (await session.execute(select(Trigger, severity).where(Trigger.status != "deleted")
                                            .order_by(Trigger.created_at.desc()))).all()
-            return [{**row_dict(t), "last_severity": last} for t, last in rows]
+            # Price alerts show progress to their target, using the worker's latest quote.
+            result = []
+            for trigger, last in rows:
+                query = next((s["query"] for s in trigger.spec["signals"] if s["detector"] == "price_level"), None)
+                price = await session.scalar(select(Price.price).where(Price.ticker == query)
+                                             .order_by(Price.ts.desc()).limit(1)) if query else None
+                event = {k: v for k, v in trigger.next_polls.get("event", {}).items() if k != "seen"}
+                result.append({**row_dict(trigger, exclude=("next_polls",)), "last_severity": last,
+                               "latest_price": price, "event_state": event or None})
+            return result
 
     @app.post("/api/triggers", status_code=201, dependencies=auth)
     async def create_trigger(data: TriggerCreate):
@@ -330,7 +347,8 @@ def create_app(settings: Settings | None = None):
                 item.spec, item.next_polls = data.spec.model_dump(mode="json"), {}
             if data.status:
                 item.status = data.status
-                item.next_polls = {}
+                # Pausing shouldn't forget an event's outcome or re-check old articles.
+                item.next_polls = {k: v for k, v in item.next_polls.items() if k == "event"}
             emit(session, "trigger_status", {"trigger_id": item.id, "status": item.status})
             await session.commit()
             return row_dict(item)

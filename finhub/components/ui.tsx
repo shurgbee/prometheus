@@ -7,23 +7,18 @@ import { direction, signedMoney, signedPct } from "@/lib/format";
 
 export function SectionHeader({
   title,
-  description,
   action,
   id,
 }: {
   title: string;
-  description?: React.ReactNode;
   action?: React.ReactNode;
   id?: string;
 }) {
   return (
     <div className="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
-      <div className="min-w-0">
-        <h2 id={id} className="section-title">
-          {title}
-        </h2>
-        {description && <p className="mt-0.5 text-sm text-ink-3">{description}</p>}
-      </div>
+      <h2 id={id} className="section-title min-w-0">
+        {title}
+      </h2>
       {action}
     </div>
   );
@@ -92,7 +87,7 @@ export function Skeleton({ className }: { className?: string }) {
 export function ErrorNote({ error, onRetry, what }: { error: unknown; onRetry?: () => void; what: string }) {
   const message = error instanceof Error ? error.message : "Unknown error";
   return (
-    <div role="alert" className="flex flex-wrap items-center gap-3 rounded border border-dashed border-line-strong px-3 py-2.5 text-sm">
+    <div role="alert" className="flex flex-wrap items-center gap-3 rounded border border-line-strong px-3 py-2.5 text-sm">
       <span className="text-ink-2">
         Couldn&apos;t load {what}: <span className="text-ink">{message}</span>
       </span>
@@ -107,7 +102,7 @@ export function ErrorNote({ error, onRetry, what }: { error: unknown; onRetry?: 
 
 export function EmptyState({ children, action }: { children: React.ReactNode; action?: React.ReactNode }) {
   return (
-    <div className="rounded border border-dashed border-line-strong px-4 py-6 text-sm text-ink-2">
+    <div className="rounded border border-edge bg-surface px-4 py-6 text-sm text-ink-2">
       <div className="max-w-prose">{children}</div>
       {action && <div className="mt-3">{action}</div>}
     </div>
@@ -126,7 +121,7 @@ export function Segmented<T extends string>({
   label: string;
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-pill border border-line p-0.5">
+    <div role="radiogroup" aria-label={label} className="bg-surface inline-flex rounded-pill border border-edge p-0.5">
       {options.map((o) => (
         <button
           key={o.value}

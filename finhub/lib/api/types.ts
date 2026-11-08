@@ -132,6 +132,18 @@ export interface Trigger extends TriggerSpec {
   last_checked_at: string | null;
   last_level: EvaluationLevel | null;
   last_severity: number | null;
+  /** Latest quote for a price_level trigger. */
+  latest_price?: number | null;
+  event_state?: EventState | null;
+}
+
+/** Progress of an event_occurs trigger. No outcome means still watching. */
+export interface EventState {
+  checked: number;
+  outcome?: "happened" | "expired";
+  at?: string;
+  url?: string;
+  title?: string;
 }
 
 /** PATCH /api/triggers/{id}. All fields optional. */
@@ -258,6 +270,8 @@ export interface TriggerProposal {
 export type ChatEvent =
   | { type: "thread"; thread_id: string }
   | { type: "token"; text: string }
+  /** Final checked text for this turn. Replaces whatever streamed. */
+  | { type: "answer"; text: string }
   | { type: "tool"; id: string; name: string; status: "running" | "done" | "error"; label?: string | null }
   | { type: "sources"; items: ChatSource[] }
   | { type: "proposals"; proposals: TriggerProposal[] }

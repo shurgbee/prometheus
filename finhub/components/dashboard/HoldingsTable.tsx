@@ -16,7 +16,6 @@ export function HoldingsTable() {
       <SectionHeader
         id="holdings-title"
         title="Holdings"
-        description="Stocks at the latest price, plus cash balances. CDs are in the ladder below."
         action={
           <Link href="/holdings" className="btn-ghost">
             Edit holdings
@@ -28,7 +27,7 @@ export function HoldingsTable() {
       ) : isLoading && !data ? (
         <Skeleton className="h-64 w-full" />
       ) : (
-        <div className="overflow-x-auto rounded-lg border border-line">
+        <div className="overflow-x-auto rounded-lg border border-edge bg-surface">
           <table className="w-full min-w-[720px] text-sm">
             <caption className="sr-only">Stock and cash holdings</caption>
             <thead>
@@ -46,7 +45,7 @@ export function HoldingsTable() {
             <tbody className="num">
               <GroupRow label="Stocks" rows={stocks} />
               {stocks.map((h) => (
-                <tr key={h.id} className="border-b border-line last:border-0 hover:bg-surface">
+                <tr key={h.id} className="border-b border-line last:border-0 hover:bg-white/5">
                   <th scope="row" className="px-4 py-2.5 text-left font-normal">
                     <span className="font-semibold text-ink">{h.ticker}</span>
                     <span className="ml-2 text-ink-3">{h.name}</span>
@@ -67,7 +66,7 @@ export function HoldingsTable() {
               ))}
               {cash.length > 0 && <GroupRow label="Cash" rows={cash} />}
               {cash.map((h) => (
-                <tr key={h.id} className="border-b border-line last:border-0 hover:bg-surface">
+                <tr key={h.id} className="border-b border-line last:border-0 hover:bg-white/5">
                   <th scope="row" className="px-4 py-2.5 text-left font-normal text-ink">
                     {h.name}
                     {h.apy ? <span className="ml-2 text-ink-3">{pct(h.apy, 2)} APY</span> : null}
@@ -97,7 +96,7 @@ function GroupRow({ label, rows }: { label: string; rows: ValuedHolding[] }) {
   if (!rows.length) return null;
   const total = rows.reduce((s, r) => s + (r.value ?? 0), 0);
   return (
-    <tr className="border-b border-line bg-surface/60">
+    <tr className="border-b border-line">
       <th scope="rowgroup" colSpan={4} className="px-4 py-1.5 text-left text-xs font-medium text-ink-2">
         {label}
       </th>

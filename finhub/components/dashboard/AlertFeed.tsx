@@ -30,7 +30,6 @@ export function AlertFeed() {
       <SectionHeader
         id="alerts-title"
         title="Alerts"
-        description="Normal alerts send a text. Critical alerts can call you."
         action={
           <Segmented
             label="Which alerts"
@@ -54,11 +53,11 @@ export function AlertFeed() {
         ) : !data?.length ? (
           <EmptyState>
             {status === "open"
-              ? "No open alerts. When a trigger finds something that matters, it shows up here as it's sent to your phone."
-              : "No alerts yet."}
+              ? "No open alerts."
+              : "No alerts."}
           </EmptyState>
         ) : (
-          <ul className="divide-y divide-line border-y border-line">
+          <ul className="divide-y divide-line overflow-hidden rounded-lg border border-edge bg-surface [&>li]:px-4">
             {data.map((a) => (
               <AlertRow key={a.id} alert={a} isNew={fresh.has(a.id)} />
             ))}
@@ -159,7 +158,7 @@ const FACTORS: { key: "magnitude" | "exposure" | "credibility" | "urgency"; labe
 
 function AlertDetail({ alert: a }: { alert: Alert }) {
   return (
-    <div className="mt-3 space-y-3 rounded border border-line bg-surface p-3">
+    <div className="mt-3 space-y-3 rounded border border-line bg-raised p-3">
       {a.rationale && <p className="text-sm text-ink-2">{a.rationale}</p>}
       {a.breakdown && (
         <div>
