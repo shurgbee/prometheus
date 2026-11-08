@@ -69,7 +69,7 @@ export function ProposalCards({ messageId, proposals, decided }: { messageId: st
                   type="checkbox"
                   checked={d.include}
                   onChange={(e) => update(p.proposal_id, (x) => ({ ...x, include: e.target.checked }))}
-                  className="mt-1 h-4 w-4 shrink-0 accent-[#7FA6F5]"
+                  className="mt-1 h-4 w-4 shrink-0 accent-[#9E3F3B]"
                 />
                 <div className="min-w-0 flex-1">
                   {editing === p.proposal_id ? (
@@ -123,7 +123,7 @@ export function ProposalCards({ messageId, proposals, decided }: { messageId: st
                       onChange={(e) =>
                         update(p.proposal_id, (x) => ({ ...x, edited: true, spec: { ...x.spec, critical_capable: e.target.checked } }))
                       }
-                      className="h-3.5 w-3.5 accent-[#7FA6F5]"
+                      className="h-3.5 w-3.5 accent-[#9E3F3B]"
                     />
                     <Phone size={12} aria-hidden className="text-ink-3" />
                     Can call me for critical alerts

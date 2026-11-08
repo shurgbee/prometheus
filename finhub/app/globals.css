@@ -4,7 +4,7 @@
 
 :root {
   color-scheme: dark;
-  --edge: #2a2a2b; /* Outer border of foreground elements, blending into the page. */
+  --edge: rgba(255, 255, 255, 0.07); /* Outer border of foreground elements, blending into the page. */
 }
 
 @layer utilities {
@@ -15,13 +15,13 @@
 
 @layer base {
   html {
-    background-color: #000;
+    background-color: theme("colors.canvas");
   }
   body {
     @apply font-sans text-base text-ink antialiased;
   }
   ::selection {
-    background: rgba(127, 166, 245, 0.35);
+    background: rgba(176, 74, 69, 0.45);
   }
   :focus-visible {
     outline: 2px solid theme("colors.accent.DEFAULT");
@@ -37,7 +37,7 @@
   }
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(237, 233, 228, 0.16) transparent;
+    scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
   }
 }
 
@@ -53,7 +53,7 @@
     @apply inline-flex items-center justify-center gap-1.5 rounded-pill px-3.5 py-1.5 text-sm font-medium transition-colors disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn bg-accent text-accent-ink hover:bg-[#9ab9f8];
+    @apply btn bg-accent-strong text-white hover:bg-[#8A3633];
   }
   .btn-ghost {
     @apply btn border bg-surface text-ink-2 hover:bg-raised hover:text-ink;
@@ -66,7 +66,23 @@
     @apply w-full rounded border border-line-strong bg-raised px-3 py-2 text-sm text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none;
   }
   .section-title {
-    @apply font-display font-semibold text-3xl text-ink;
+    @apply font-display font-medium text-xl text-ink;
+  }
+  .page-title {
+    @apply font-display text-3xl font-normal tracking-[-0.02em] text-ink sm:text-[44px] sm:leading-[48px];
+  }
+  .tile {
+    @apply rounded-lg bg-surface p-5;
+  }
+  /* The one colored tile on a page. */
+  .tile-hero {
+    background:
+      radial-gradient(85% 120% at 95% 0%, #a84a45 0%, transparent 65%),
+      radial-gradient(90% 130% at 0% 100%, #2e1514 0%, transparent 75%),
+      #6b2c2a;
+  }
+  .hatch {
+    background-image: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.2) 0 1px, transparent 1px 4px);
   }
   .label {
     @apply text-xs text-ink-3;

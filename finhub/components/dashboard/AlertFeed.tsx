@@ -2,12 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { BellRing, Check, ChevronDown, ExternalLink, Phone } from "lucide-react";
+import { Bell, BellRing, Check, ChevronDown, ExternalLink, Phone } from "lucide-react";
 import { api, type Alert } from "@/lib/api";
 import { refresh, useAlerts } from "@/lib/hooks";
 import { dateTime, pct, relativeTime } from "@/lib/format";
 import { deliveryLabel } from "@/lib/labels";
-import { EmptyState, ErrorNote, SectionHeader, Segmented, Skeleton } from "@/components/ui";
+import { EmptyState, ErrorNote, Segmented, Skeleton, TileHeader } from "@/components/ui";
 
 export function AlertFeed() {
   const [status, setStatus] = useState<"open" | "all">("open");
@@ -26,10 +26,11 @@ export function AlertFeed() {
   }, [data]);
 
   return (
-    <section aria-labelledby="alerts-title">
-      <SectionHeader
+    <section aria-labelledby="alerts-title" className="tile flex h-full flex-col">
+      <TileHeader
         id="alerts-title"
         title="Alerts"
+        icon={Bell}
         action={
           <Segmented
             label="Which alerts"
@@ -57,7 +58,7 @@ export function AlertFeed() {
               : "No alerts."}
           </EmptyState>
         ) : (
-          <ul className="divide-y divide-line overflow-hidden rounded-lg border border-edge bg-surface [&>li]:px-4">
+          <ul className="-mt-3 divide-y divide-line overflow-y-auto md:max-h-[460px]">
             {data.map((a) => (
               <AlertRow key={a.id} alert={a} isNew={fresh.has(a.id)} />
             ))}
@@ -94,7 +95,7 @@ function AlertRow({ alert: a, isNew }: { alert: Alert; isNew: boolean }) {
         <span
           className={clsx(
             "mt-0.5 flex h-8 w-8 items-center justify-center rounded-full",
-            critical ? "bg-status-critical/15 text-[#F08A8A]" : "bg-status-normal/10 text-status-normal",
+            critical ? "bg-status-critical/15 text-status-critical" : "bg-status-normal/10 text-status-normal",
             isNew && critical && "animate-pulse-ring",
           )}
         >

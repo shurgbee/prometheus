@@ -21,12 +21,12 @@ export default function ReportsPage() {
   const searching = debounced.length > 0;
 
   return (
-    <div className="space-y-10">
-      <header>
-        <h1 className="font-display font-semibold text-3xl text-ink sm:text-[44px] sm:leading-[48px]">Reports</h1>
+    <div className="space-y-6">
+      <header className="mt-4 px-1">
+        <h1 className="page-title">Reports</h1>
       </header>
 
-      <div className="grid gap-10 lg:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="min-w-0 space-y-6">
           <div className="relative">
             <label htmlFor="report-search" className="sr-only">
@@ -39,7 +39,7 @@ export default function ReportsPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search reports"
-              className="field rounded-pill py-2.5 pl-10"
+              className="field rounded-pill border-transparent bg-surface py-2.5 pl-10"
             />
           </div>
 

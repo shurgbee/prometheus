@@ -1,8 +1,9 @@
 "use client";
 
+import { CalendarClock } from "lucide-react";
 import { usePortfolio } from "@/lib/hooks";
 import { daysUntil, money, pct, shortDate } from "@/lib/format";
-import { EmptyState, ErrorNote, SectionHeader, Skeleton } from "@/components/ui";
+import { EmptyState, ErrorNote, Skeleton, TileHeader } from "@/components/ui";
 
 export function CdLadder() {
   const { data, error, isLoading, mutate } = usePortfolio();
@@ -11,8 +12,8 @@ export function CdLadder() {
     .sort((a, b) => (a.maturity_date ?? "9999").localeCompare(b.maturity_date ?? "9999"));
 
   return (
-    <section aria-labelledby="cd-title">
-      <SectionHeader id="cd-title" title="CD ladder" />
+    <section aria-labelledby="cd-title" className="tile flex h-full flex-col">
+      <TileHeader id="cd-title" title="CD ladder" icon={CalendarClock} />
       {error && !data ? (
         <ErrorNote error={error} what="CDs" onRetry={() => mutate()} />
       ) : isLoading && !data ? (
@@ -20,7 +21,7 @@ export function CdLadder() {
       ) : !cds.length ? (
         <EmptyState>No CDs yet.</EmptyState>
       ) : (
-        <ul className="divide-y divide-line overflow-hidden rounded-lg border border-edge bg-surface [&>li]:px-4">
+        <ul className="-mt-3 divide-y divide-line">
           {cds.map((cd) => {
             const left = daysUntil(cd.maturity_date);
             const total = cd.start_date && cd.maturity_date ? daysUntil(cd.maturity_date, new Date(`${cd.start_date}T12:00:00Z`)) : null;
@@ -43,7 +44,7 @@ export function CdLadder() {
                       aria-valuemax={100}
                       aria-valuenow={Math.round(progress * 100)}
                     >
-                      <span className="block h-full rounded-full bg-series-cd" style={{ width: `${progress * 100}%` }} />
+                      <span className="block h-full rounded-full bg-ink" style={{ width: `${progress * 100}%` }} />
                     </div>
                   ) : (
                     <div className="h-1.5 rounded-full bg-raised" />

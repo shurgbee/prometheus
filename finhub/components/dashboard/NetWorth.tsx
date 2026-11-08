@@ -1,19 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Cell, Pie, PieChart, ResponsiveContainer, Sector } from "recharts";
+import { Layers, Wallet } from "lucide-react";
+import { Cell, Pie, PieChart, Sector } from "recharts";
 import { usePortfolio } from "@/lib/hooks";
 import { dateTime, money, pct } from "@/lib/format";
 import CountUp from "@/components/CountUp";
-import { Delta, ErrorNote, Skeleton } from "@/components/ui";
+import { Delta, ErrorNote, Skeleton, TileHeader } from "@/components/ui";
 
 const CLASSES = [
-  { key: "cash", label: "Cash", color: "#3987E5" },
-  { key: "cd", label: "CDs", color: "#D95926" },
-  { key: "stocks", label: "Stocks", color: "#199E70" },
+  { key: "cash", label: "Cash", color: "#F6F4F4" },
+  { key: "cd", label: "CDs", color: "#A3A3A6" },
+  { key: "stocks", label: "Stocks", color: "#B04A45" },
 ] as const;
 
 const SWEEP_MS = 900;
+const GAUGE = { width: 240, height: 124, outer: 116, inner: 92 };
 
 // Recharts animates in JS, so the global prefers-reduced-motion CSS rule does not reach it.
 function useReducedMotion() {
@@ -31,41 +33,36 @@ function useReducedMotion() {
 export function NetWorth() {
   const { data, error, isLoading, mutate } = usePortfolio();
 
-  if (error && !data) return <ErrorNote error={error} what="your portfolio" onRetry={() => mutate()} />;
-
   return (
-    <section aria-labelledby="networth-title" className="grid gap-8 rounded-lg border border-edge bg-surface p-5 sm:p-6 md:grid-cols-[minmax(0,1fr)_minmax(0,360px)] md:items-center">
-      <div className="min-w-0">
-        <h1 id="networth-title" className="section-title">
-          Net worth
-        </h1>
-        {isLoading || !data ? (
-          <div className="mt-3 space-y-3">
-            <Skeleton className="h-14 w-72" />
-            <Skeleton className="h-5 w-48" />
+    <section aria-labelledby="networth-title" className="tile tile-hero flex h-full min-h-[280px] flex-col">
+      <TileHeader id="networth-title" title="Net worth" icon={Wallet} />
+      {error && !data ? (
+        <ErrorNote error={error} what="your portfolio" onRetry={() => mutate()} />
+      ) : isLoading || !data ? (
+        <div className="mt-auto space-y-3">
+          <Skeleton className="h-14 w-72 max-w-full" />
+          <Skeleton className="h-5 w-48" />
+        </div>
+      ) : (
+        <div className="mt-auto min-w-0">
+          {data.total == null ? <p className="text-3xl text-ink">Awaiting prices</p> : <Hero value={data.total} />}
+          {data.warnings?.length ? <p className="mt-2 text-xs text-ink">{data.warnings.join(". ")}</p> : null}
+          <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
+            <Delta amount={data.day_change} fraction={data.day_change_pct} suffix="today" className="!text-ink [&_span]:!text-ink" />
+            <span className="text-ink-2">
+              Updated {dateTime(data.as_of)}
+              {data.market_open ? ", refreshing every minute" : ""}
+            </span>
           </div>
-        ) : (
-          <>
-            {data.total == null ? <p className="mt-2 text-3xl text-ink">Awaiting prices</p> : <Hero value={data.total} />}
-            {data.warnings?.length ? <p className="mt-2 text-xs text-down">{data.warnings.join(". ")}</p> : null}
-            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-              <Delta amount={data.day_change} fraction={data.day_change_pct} suffix="today" />
-              <span className="text-ink-3">
-                Updated {dateTime(data.as_of)}
-                {data.market_open ? ", refreshing every minute" : ""}
-              </span>
-            </div>
-          </>
-        )}
-      </div>
-      <Allocation allocation={data?.allocation} total={data?.total} loading={isLoading || !data} />
+        </div>
+      )}
     </section>
   );
 }
 
 function Hero({ value }: { value: number }) {
   return (
-    <p className="mt-2 text-[44px] font-bold leading-[1.05] tracking-[-0.015em] text-ink sm:text-hero" aria-label={money(value, { cents: true })}>
+    <p className="text-[40px] font-medium leading-[1.05] tracking-[-0.02em] text-ink sm:text-[52px] 2xl:text-[64px]" aria-label={money(value, { cents: true })}>
       <CountUp
         to={value}
         mode="roll"
@@ -75,7 +72,7 @@ function Hero({ value }: { value: number }) {
         prefix="$"
         separator=","
         trigger="load"
-        fractionClassName="text-ink-3"
+        fractionClassName="text-ink-2"
         proportional
         className="inline-block align-top"
         style={{ marginBlock: "-0.075em" }} // keeps the roll's 1.2em cells inside the original line height
@@ -84,29 +81,29 @@ function Hero({ value }: { value: number }) {
   );
 }
 
-function Allocation({
-  allocation,
-  total,
-  loading,
-}: {
-  allocation?: { cash: number; cd: number; stocks: number };
-  total?: number | null;
-  loading: boolean;
-}) {
+export function Allocation() {
+  const { data, error, isLoading, mutate } = usePortfolio();
   const [active, setActive] = useState<number | null>(null);
   const reducedMotion = useReducedMotion();
+  const allocation = data?.allocation;
+  const total = data?.total;
 
-  if (!loading && allocation && total == null) return <p className="text-sm text-ink-3">Allocation weights await complete pricing.</p>;
-  if (loading || !allocation || total == null) {
-    return (
-      <div className="flex items-center gap-5">
-        <Skeleton className="h-[112px] w-[112px] shrink-0 rounded-full sm:h-[148px] sm:w-[148px]" />
-        <div className="flex-1 space-y-3">
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-full" />
-          <Skeleton className="h-4 w-full" />
-        </div>
-      </div>
+  const shell = (children: React.ReactNode) => (
+    <section aria-labelledby="allocation-title" className="tile flex h-full flex-col">
+      <TileHeader id="allocation-title" title="Allocation" icon={Layers} />
+      {children}
+    </section>
+  );
+
+  if (error && !data) return shell(<ErrorNote error={error} what="allocation" onRetry={() => mutate()} />);
+  if (!isLoading && allocation && total == null) return shell(<p className="text-sm text-ink-3">Allocation weights await complete pricing.</p>);
+  if (isLoading || !allocation || total == null) {
+    return shell(
+      <div className="space-y-3">
+        <Skeleton className="mx-auto h-[124px] w-[240px] max-w-full" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-full" />
+      </div>,
     );
   }
 
@@ -115,51 +112,52 @@ function Allocation({
   const largest = rows.reduce((a, b) => (b.value > a.value ? b : a), rows[0]);
   const focus = active != null ? chartRows[active] : largest;
 
-  return (
-    <figure className="flex items-center gap-4 sm:gap-6" aria-label="Allocation of net worth">
-      <div className="relative h-[112px] w-[112px] shrink-0 sm:h-[148px] sm:w-[148px]">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={chartRows}
-              dataKey="value"
-              nameKey="label"
-              innerRadius="68%"
-              outerRadius="94%"
-              startAngle={90}
-              endAngle={-270}
-              stroke="#14110F"
-              strokeWidth={2}
-              isAnimationActive={!reducedMotion}
-              animationBegin={0}
-              animationDuration={SWEEP_MS}
-              animationEasing="ease-out"
-              activeIndex={active ?? undefined}
-              activeShape={(props: unknown) => {
-                const p = props as React.ComponentProps<typeof Sector>;
-                return <Sector {...p} outerRadius={(Number(p.outerRadius) || 0) + 3} />;
-              }}
-              onMouseEnter={(_, i) => setActive(i)}
-              onMouseLeave={() => setActive(null)}
-            >
-              {chartRows.map((r) => (
-                <Cell key={r.key} fill={r.color} />
-              ))}
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
+  return shell(
+    <figure className="flex flex-1 flex-col justify-between gap-4" aria-label="Allocation of net worth">
+      <div className="relative mx-auto" style={{ width: GAUGE.width, height: GAUGE.height }}>
+        <PieChart width={GAUGE.width} height={GAUGE.height} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+          <Pie
+            data={chartRows}
+            dataKey="value"
+            nameKey="label"
+            cx={GAUGE.width / 2}
+            cy={GAUGE.height - 4}
+            innerRadius={GAUGE.inner}
+            outerRadius={GAUGE.outer}
+            startAngle={180}
+            endAngle={0}
+            cornerRadius={4}
+            stroke="#151516"
+            strokeWidth={2}
+            isAnimationActive={!reducedMotion}
+            animationBegin={0}
+            animationDuration={SWEEP_MS}
+            animationEasing="ease-out"
+            activeIndex={active ?? undefined}
+            activeShape={(props: unknown) => {
+              const p = props as React.ComponentProps<typeof Sector>;
+              return <Sector {...p} outerRadius={(Number(p.outerRadius) || 0) + 3} />;
+            }}
+            onMouseEnter={(_, i) => setActive(i)}
+            onMouseLeave={() => setActive(null)}
+          >
+            {chartRows.map((r) => (
+              <Cell key={r.key} fill={r.color} />
+            ))}
+          </Pie>
+        </PieChart>
         {focus && (
           <div
-            className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center"
+            className="pointer-events-none absolute inset-x-0 bottom-0 flex flex-col items-center text-center"
             style={{ animation: `row-in 380ms cubic-bezier(0.2, 0.7, 0.2, 1) ${SWEEP_MS * 0.6}ms both` }}
           >
-            <span className="text-lg font-semibold text-ink">{pct(focus.share, 0)}</span>
-            <span className="text-2xs text-ink-3">{focus.label}</span>
+            <span className="text-3xl font-medium tracking-[-0.02em] text-ink num">{pct(focus.share, 0)}</span>
+            <span className="text-xs text-ink-3">{focus.label}</span>
           </div>
         )}
       </div>
-      <figcaption className="min-w-0 flex-1">
-        <ul className="space-y-2">
+      <figcaption>
+        <ul className="space-y-1.5">
           {rows.map((r) => (
             <li
               key={r.key}
@@ -179,6 +177,6 @@ function Allocation({
           ))}
         </ul>
       </figcaption>
-    </figure>
+    </figure>,
   );
 }

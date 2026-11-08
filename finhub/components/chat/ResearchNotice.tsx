@@ -36,7 +36,7 @@ export function ResearchNotice({ jobId, topic }: { jobId: string; topic: string 
             Read the report
           </Link>
         ) : status === "failed" ? (
-          <p className="text-xs text-ink-2">The report failed: {data?.error || "no reason given"}. Ask again to retry.</p>
+          <p className="text-xs text-ink-2">The report failed: {(data?.error || "no reason given").replace(/\.+$/, "")}. Ask again to retry.</p>
         ) : error && !data ? (
           <p className="text-xs text-ink-2">Couldn&apos;t check on the report. It may still be running; look under Reports in a minute.</p>
         ) : (

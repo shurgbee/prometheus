@@ -28,9 +28,9 @@ export default function HoldingsPage() {
   const { data, error, isLoading, mutate } = usePortfolio();
 
   return (
-    <div className="space-y-12">
-      <header>
-        <h1 className="font-display font-semibold text-3xl text-ink sm:text-[44px] sm:leading-[48px]">Holdings</h1>
+    <div className="space-y-8">
+      <header className="mt-4 px-1">
+        <h1 className="page-title">Holdings</h1>
       </header>
 
       <section aria-labelledby="list-title">
@@ -61,7 +61,7 @@ export default function HoldingsPage() {
         )}
       </section>
 
-      <div className="grid gap-12 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
         <section aria-labelledby="add-title">
           <SectionHeader id="add-title" title="Add a holding" />
           <div className="rounded-lg border border-edge bg-surface p-4">

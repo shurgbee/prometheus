@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import clsx from "clsx";
-import { Pause, Play, Trash2 } from "lucide-react";
+import { Eye, Pause, Play, Trash2 } from "lucide-react";
 import { api, type EventState, type Trigger } from "@/lib/api";
 import { refresh, useEvaluations, useTriggers } from "@/lib/hooks";
 import { money, relativeTime, shortDate } from "@/lib/format";
-import { EmptyState, ErrorNote, LevelBadge, SectionHeader, Skeleton, Ticker } from "@/components/ui";
+import { EmptyState, ErrorNote, LevelBadge, Skeleton, Ticker, TileHeader } from "@/components/ui";
 import { SeverityTrace } from "./SeverityTrace";
 import { signalLabel } from "@/lib/labels";
 
@@ -14,11 +14,8 @@ export function Watching() {
   const { data, error, isLoading, mutate } = useTriggers();
 
   return (
-    <section aria-labelledby="watching-title">
-      <SectionHeader
-        id="watching-title"
-        title="Watching"
-      />
+    <section aria-labelledby="watching-title" className="tile flex h-full flex-col">
+      <TileHeader id="watching-title" title="Watching" icon={Eye} />
       {error && !data ? (
         <ErrorNote error={error} what="triggers" onRetry={() => mutate()} />
       ) : isLoading && !data ? (
@@ -31,7 +28,7 @@ export function Watching() {
           Nothing watched yet.
         </EmptyState>
       ) : (
-        <ul className="divide-y divide-line overflow-hidden rounded-lg border border-edge bg-surface [&>li]:px-4">
+        <ul className="-mt-3 divide-y divide-line overflow-y-auto md:max-h-[460px]">
           {data.map((t) => (
             <TriggerRow key={t.id} trigger={t} />
           ))}
@@ -54,14 +51,14 @@ function PriceProgress({ level, direction, price, label }: { level: number; dire
         <span className="text-ink-2 num">Target {money(level)}</span>
       </div>
       <div
-        className="mt-2 h-1.5 overflow-hidden rounded-pill bg-white/10"
+        className="mt-2 h-1.5 overflow-hidden rounded-pill bg-raised"
         role="progressbar"
         aria-label={`${label}: progress to target`}
         aria-valuemin={0}
         aria-valuemax={100}
         aria-valuenow={Math.round(fraction * 100)}
       >
-        <div className="h-full rounded-pill bg-accent" style={{ width: `${fraction * 100}%` }} />
+        <div className="h-full rounded-pill bg-ink" style={{ width: `${fraction * 100}%` }} />
       </div>
       <p className="mt-2 text-xs text-ink-2 num">
         {reached ? "Target reached" : `${money(remaining)} to go, needs a ${needed.toFixed(1)}% ${direction === "above" ? "rise" : "fall"}`}
@@ -119,7 +116,7 @@ function TriggerRow({ trigger: t }: { trigger: Trigger }) {
   }
 
   return (
-    <li className={clsx("grid gap-x-6 gap-y-3 py-4 md:grid-cols-[minmax(0,240px)_minmax(0,1fr)_auto] md:items-center", paused && "opacity-60")}>
+    <li className={clsx("grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 py-4", paused && "opacity-60")}>
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-ink" title={t.name}>
           {t.name}
@@ -137,7 +134,7 @@ function TriggerRow({ trigger: t }: { trigger: Trigger }) {
         )}
       </div>
 
-      <div className="mr-9 min-w-0">
+      <div className="order-last col-span-2 min-w-0">
         {eventSignal ? (
           <EventStatus state={t.event_state} deadline={typeof eventSignal.params?.deadline === "string" ? eventSignal.params.deadline : null} />
         ) : levelSignal ? (
@@ -154,7 +151,7 @@ function TriggerRow({ trigger: t }: { trigger: Trigger }) {
         )}
       </div>
 
-      <div className="flex items-center justify-between gap-4 md:w-[176px] md:flex-col md:items-end md:justify-center md:gap-1.5">
+      <div className="flex flex-col items-end gap-1">
         <div className="text-right">
           {paused ? <span className="text-xs text-ink-3">Paused</span> : <LevelBadge level={t.last_level} />}
           <p className="text-2xs text-ink-3">
