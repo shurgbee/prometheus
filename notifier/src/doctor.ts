@@ -7,6 +7,7 @@ import { normalizeHandle } from "./photon.ts";
 const config = loadConfig();
 const phone = normalizeHandle(process.env.ALERT_PHONE ?? "");
 const base = `${config.photonApiUrl}/v1/projects/${encodeURIComponent(config.photonProjectId)}`;
+const platform = config.photonPlatform ?? "imessage";
 
 const mask = (value: unknown) =>
   JSON.stringify(value, null, 2).replace(/\+?\d{7,15}/g, (m) => `…${m.slice(-4)}`);
@@ -37,14 +38,14 @@ async function section(title: string, path: string) {
   }
 }
 
-await section("iMessage platform", "/platforms/imessage");
+if (platform === "imessage") await section("iMessage platform", "/platforms/imessage");
 await section("Lines and numbers", "/platforms/resources?pageSize=50");
-await section("iMessage assignments", "/platforms/imessage/assignments?pageSize=50");
-const users = await section("iMessage users", "/users?platform=imessage&pageSize=50");
+if (platform === "imessage") await section("iMessage assignments", "/platforms/imessage/assignments?pageSize=50");
+const users = await section(`${platform} users`, `/users?platform=${platform}&pageSize=50`);
 const me = (users?.items ?? []).find((u: any) => normalizeHandle(String(u.handle)) === phone);
 if (me?.kind === "agent") console.log("\n!! ALERT_PHONE is the Photon line itself. Set it to the phone or Apple ID you text the line from.");
 if (me) {
-  await section("Conversations with ALERT_PHONE", `/spaces?platform=imessage&participantId=${me.id}&pageSize=20`);
+  await section("Conversations with ALERT_PHONE", `/spaces?platform=${platform}&participantId=${me.id}&pageSize=20`);
 } else {
-  console.log("\nALERT_PHONE is not among the project's iMessage users yet.");
+  console.log(`\nALERT_PHONE is not among the project's ${platform} users yet.`);
 }

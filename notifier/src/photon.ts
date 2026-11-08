@@ -36,6 +36,7 @@ type Route = { senderId: string; spaceId: string };
  */
 export class PhotonApiSender implements TextSender {
   private readonly routes = new Map<string, Route>();
+  private get platform() { return this.config.photonPlatform ?? "imessage"; }
 
   constructor(private readonly config: NotifierConfig, private readonly fetchImpl: typeof fetch = fetch) {}
 
@@ -82,7 +83,8 @@ export class PhotonApiSender implements TextSender {
   private async resolveRoute(phone: string): Promise<Route> {
     const cached = this.routes.get(phone);
     if (cached) return cached;
-    const recipient = await this.call("POST", "/users", { handle: phone, platform: "imessage" });
+    if (this.platform === "sms" && !E164.test(phone)) throw new Error("SMS requires an E.164 phone number");
+    const recipient = await this.call("POST", "/users", { handle: phone, platform: this.platform });
     const recipientId = String(recipient.id);
     if (String(recipient.kind).toLowerCase() === "agent") {
       throw new PhotonError(422, "RECIPIENT_IS_LINE",
@@ -93,7 +95,7 @@ export class PhotonApiSender implements TextSender {
     let senderId = this.config.photonSenderId;
 
     if (!senderId) {
-      const query = new URLSearchParams({ platform: "imessage", participantId: recipientId,
+      const query = new URLSearchParams({ platform: this.platform, participantId: recipientId,
         orderBy: "last_message_created_at", order: "desc", pageSize: "50" });
       const page = await this.call("GET", `/spaces?${query}`);
       for (const space of (page.items as Json[] | undefined) ?? []) {
@@ -111,8 +113,8 @@ export class PhotonApiSender implements TextSender {
     }
 
     const space = await this.call("POST", "/spaces",
-      { participantIds: [senderId, recipientId], platform: "imessage" },
-      `finhub-space-${senderId}-${recipientId}`);
+      { participantIds: [senderId, recipientId], platform: this.platform },
+      `finhub-space-${this.platform}-${senderId}-${recipientId}`);
     const route = { senderId, spaceId: String(space.id) };
     this.routes.set(phone, route);
     return route;
@@ -123,7 +125,7 @@ export class PhotonApiSender implements TextSender {
     const agents: Json[] = [];
     let pageToken: string | undefined;
     do {
-      const query = new URLSearchParams({ platform: "imessage", pageSize: "100", ...(pageToken ? { pageToken } : {}) });
+      const query = new URLSearchParams({ platform: this.platform, pageSize: "100", ...(pageToken ? { pageToken } : {}) });
       const page = await this.call("GET", `/users?${query}`);
       for (const user of (page.items as Json[] | undefined) ?? []) {
         const handle = normalizeHandle(String(user.handle ?? ""));
@@ -133,9 +135,10 @@ export class PhotonApiSender implements TextSender {
       pageToken = page.nextPageToken as string | undefined;
     } while (pageToken);
     if (agents.length === 0) {
-      throw new PhotonError(404, "NO_CONVERSATION",
-        `NO_CONVERSATION: No conversation with ${maskPhone(phone)} on your Photon line yet. ` +
-        "Text the Photon line once from that phone number or Apple ID, then retry.");
+      throw new PhotonError(404, "NO_CONVERSATION", this.platform === "sms"
+        ? "No SMS agent identity found for PHOTON_LINE. Check the line's SMS activation and sender user."
+        : `NO_CONVERSATION: No conversation with ${maskPhone(phone)} on your Photon line yet. ` +
+          "Text the Photon line once from that phone number or Apple ID, then retry.");
     }
     if (agents.length > 1) {
       log.warn("several iMessage lines found; using the first. Set PHOTON_LINE to choose one.", { line: agents[0].handle });

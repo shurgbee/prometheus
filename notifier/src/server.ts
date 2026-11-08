@@ -6,6 +6,7 @@ import { type DeliveryOptions, DeliveryService } from "./deliveries.ts";
 import { errorMessage, log } from "./log.ts";
 import { createSender, normalizeHandle, type TextSender } from "./photon.ts";
 import { type AlertPayload, DeliveryStore } from "./store.ts";
+import { GatewayVoiceSender } from "./voice.ts";
 
 const MAX_BODY = 64 * 1024;
 
@@ -57,7 +58,11 @@ export function parseAlert(input: unknown): AlertPayload {
   if (!phone) throw new HttpError(422, "phone must be an E.164 number (e.g. +15555550123) or an Apple ID email");
   const channel = body.channel ?? "text";
   if (channel !== "text" && channel !== "call") throw new HttpError(422, "channel must be 'text' or 'call'");
+  if (channel === "call" && !/^\+[1-9]\d{6,14}$/.test(phone)) throw new HttpError(422, "Calls require an E.164 phone number");
   const severity = body.severity;
+  if (body.test_call !== undefined && typeof body.test_call !== "boolean") {
+    throw new HttpError(422, "test_call must be a boolean");
+  }
   if (severity !== undefined && severity !== null && (typeof severity !== "number" || !Number.isFinite(severity))) {
     throw new HttpError(422, "severity must be a number");
   }
@@ -70,6 +75,7 @@ export function parseAlert(input: unknown): AlertPayload {
     url: str(body, "url", 2000, false),
     channel,
     ...(typeof severity === "number" ? { severity } : {}),
+    ...(body.test_call === true ? { test_call: true } : {}),
   };
 }
 
@@ -79,6 +85,9 @@ export function createNotifier(config: NotifierConfig, sender: TextSender = crea
   const deliveries = new DeliveryService(store, sender, {
     backendUrl: config.backendUrl,
     notifierToken: config.notifierToken,
+    voice: !config.dryRun && config.voiceGatewayUrl
+      ? new GatewayVoiceSender(config.voiceGatewayUrl, config.notifierToken) : undefined,
+    voiceRetryDelayMs: config.voiceRetryDelayMs,
     ...overrides,
   });
 
@@ -122,6 +131,7 @@ async function main() {
   const shutdown = (signal: string) => {
     log.info("shutting down", { signal });
     (server as Server).close();
+    deliveries.stop();
     void deliveries.idle().then(() => sender.close()).finally(() => process.exit(0));
     setTimeout(() => process.exit(0), 10_000).unref();
   };

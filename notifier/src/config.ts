@@ -44,6 +44,9 @@ export interface NotifierConfig {
   photonApiUrl: string;
   photonProjectId: string;
   photonApiKey: string;
+  photonPlatform?: "imessage" | "sms";
+  voiceGatewayUrl?: string;
+  voiceRetryDelayMs?: number;
   /** Optional: the line's phone number, when the project has several iMessage lines. */
   photonLine: string;
   /** Optional: the line's Photon user ID, skipping line lookup. */
@@ -73,6 +76,9 @@ export function loadConfig(): NotifierConfig {
     photonApiUrl: (env("PHOTON_API_URL") || "https://api.photon.codes").replace(/\/+$/, ""),
     photonProjectId,
     photonApiKey,
+    photonPlatform: (env("PHOTON_PLATFORM") || "imessage") as "imessage" | "sms",
+    voiceGatewayUrl: env("VOICE_GATEWAY_URL").replace(/\/+$/, ""),
+    voiceRetryDelayMs: Number(env("VOICE_RETRY_DELAY_MS") || 120_000),
     photonLine: env("PHOTON_LINE"),
     photonSenderId: env("PHOTON_SENDER_ID"),
     spectrumProjectId,
@@ -94,5 +100,7 @@ export function loadConfig(): NotifierConfig {
     throw new Error(`Notifier configuration is incomplete. Set: ${missing.join(", ")}`);
   }
   if (!Number.isInteger(config.port) || config.port <= 0) throw new Error("NOTIFIER_PORT must be a port number");
+  if (!["sms", "imessage"].includes(config.photonPlatform!)) throw new Error("PHOTON_PLATFORM must be sms or imessage");
+  if (!Number.isFinite(config.voiceRetryDelayMs) || config.voiceRetryDelayMs! < 0) throw new Error("Invalid VOICE_RETRY_DELAY_MS");
   return config;
 }

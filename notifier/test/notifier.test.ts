@@ -10,6 +10,7 @@ import type { NotifierConfig } from "../src/config.ts";
 import { normalizeHandle, PhotonApiSender, PhotonError, type TextSender } from "../src/photon.ts";
 import { createNotifier, parseAlert } from "../src/server.ts";
 import { type AlertPayload, DeliveryStore } from "../src/store.ts";
+import { GatewayVoiceSender, type VoiceSender } from "../src/voice.ts";
 
 const TOKEN = "notifier-test-token-0123456789";
 
@@ -249,4 +250,165 @@ test("accepts phone numbers and Apple ID emails as recipients", () => {
   assert.equal(normalizeHandle("First.Last@Example.com"), "first.last@example.com");
   assert.equal(normalizeHandle("555-0123"), "");
   assert.equal(parseAlert({ ...alert(), phone: "first.last@example.com" }).phone, "first.last@example.com");
+});
+
+test("calls once, then sends one detail text; duplicate acceptance never redials", async () => {
+  const sender = new FakeSender();
+  const backend = fakeBackend();
+  const keys: string[] = [];
+  const voice: VoiceSender = { async call(_, key) { keys.push(key); return "completed"; } };
+  const store = new DeliveryStore(tempStore());
+  const service = new DeliveryService(store, sender,
+    { backendUrl: "http://backend", notifierToken: TOKEN, fetchImpl: backend.fetchImpl, voice });
+  const payload = alert({ level: "Critical", channel: "call" });
+  service.accept(payload);
+  await service.idle();
+  service.accept(payload);
+  await service.idle();
+  assert.deepEqual(keys, ["a1:call:1"]);
+  assert.equal(sender.sent.length, 1);
+  assert.equal(store.get("a1")!.voiceOutcome, "completed");
+  assert.equal(store.get("a1")!.backendStatus, "sent");
+  assert.equal(store.get("a1")!.callbackDone, true);
+});
+
+test("a throttled Critical text never calls even when a voice provider is enabled", async () => {
+  let calls = 0;
+  const voice: VoiceSender = { async call() { calls++; return "completed"; } };
+  const backend = fakeBackend();
+  const service = new DeliveryService(new DeliveryStore(tempStore()), new FakeSender(),
+    { backendUrl: "http://backend", notifierToken: TOKEN, fetchImpl: backend.fetchImpl, voice });
+  service.accept(alert({ level: "Critical", channel: "text" }));
+  await service.idle();
+  assert.equal(calls, 0);
+});
+
+test("missed call retry survives restart, checks ack state, and sends separate detail/fallback texts", async () => {
+  const path = tempStore();
+  const sender = new FakeSender();
+  const keys: string[] = [];
+  const voice: VoiceSender = { async call(_, key) { keys.push(key); return "missed"; } };
+  const fetchImpl = (async () => new Response(JSON.stringify({ trigger_status: "active" }))) as typeof fetch;
+  const options = { backendUrl: "http://backend", notifierToken: TOKEN, fetchImpl, voice, voiceRetryDelayMs: 5 };
+  const first = new DeliveryService(new DeliveryStore(path), sender, options);
+  first.accept(alert({ channel: "call", level: "Critical" }));
+  await first.idle();
+  first.stop();
+  assert.equal(sender.sent.length, 1);
+  await new Promise((resolve) => setTimeout(resolve, 10));
+  const store = new DeliveryStore(path);
+  const second = new DeliveryService(store, sender, options);
+  second.resume();
+  await second.idle();
+  second.stop();
+  assert.deepEqual(keys, ["a1:call:1", "a1:call:2"]);
+  assert.equal(sender.sent.length, 2);
+  assert.match(sender.sent[1].body, /^Missed critical call/);
+  assert.equal(store.get("a1")!.backendStatus, "text_fallback");
+});
+
+test("dashboard acknowledgement cancels a pending missed-call retry", async () => {
+  const store = new DeliveryStore(tempStore());
+  store.insert(alert({ channel: "call" }));
+  store.update("a1", { status: "waiting_retry", voiceAttempts: 1, nextCallAt: new Date(0).toISOString() });
+  let calls = 0;
+  const service = new DeliveryService(store, new FakeSender(), { backendUrl: "http://backend", notifierToken: TOKEN,
+    voice: { async call() { calls++; return "completed"; } },
+    fetchImpl: (async () => new Response(JSON.stringify({ acked_at: new Date().toISOString() }))) as typeof fetch });
+  service.resume();
+  await service.idle();
+  assert.equal(calls, 0);
+  assert.equal(store.get("a1")!.status, "cancelled");
+});
+
+test("restart reconciles the same in-flight gateway key instead of reserving another dial", async () => {
+  const store = new DeliveryStore(tempStore());
+  store.insert(alert({ channel: "call" }));
+  store.update("a1", { status: "calling", voiceAttempts: 1, callJobKey: "a1:call:1" });
+  const keys: string[] = [];
+  const backend = fakeBackend();
+  const service = new DeliveryService(store, new FakeSender(), { backendUrl: "http://backend", notifierToken: TOKEN,
+    fetchImpl: backend.fetchImpl, voice: { async call(_, key) { keys.push(key); return "completed"; } } });
+  service.resume();
+  await service.idle();
+  assert.deepEqual(keys, ["a1:call:1"]);
+  assert.equal(store.get("a1")!.voiceAttempts, 1);
+});
+
+test("an ongoing call does not block another alert's text", async () => {
+  let finish!: (value: "completed") => void;
+  const voice: VoiceSender = { call() { return new Promise((resolve) => { finish = resolve; }); } };
+  const backend = fakeBackend();
+  const sender = new FakeSender();
+  const service = new DeliveryService(new DeliveryStore(tempStore()), sender,
+    { backendUrl: "http://backend", notifierToken: TOKEN, fetchImpl: backend.fetchImpl, voice });
+  service.accept(alert({ channel: "call" }));
+  service.accept(alert({ alert_id: "text" }));
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal(sender.sent.length, 1);
+  finish("completed");
+  await service.idle();
+  assert.equal(sender.sent.length, 2);
+});
+
+test("a crash after completed playback resumes the detail text without another dial", async () => {
+  const store = new DeliveryStore(tempStore());
+  store.insert(alert({ channel: "call" }));
+  store.update("a1", { status: "calling", voiceAttempts: 1, voiceOutcome: "completed" });
+  let calls = 0;
+  const sender = new FakeSender();
+  const backend = fakeBackend();
+  const service = new DeliveryService(store, sender, { backendUrl: "http://backend", notifierToken: TOKEN,
+    fetchImpl: backend.fetchImpl, voice: { async call() { calls++; return "completed"; } } });
+  service.resume();
+  await service.idle();
+  assert.equal(calls, 0);
+  assert.equal(sender.sent.length, 1);
+  assert.equal(store.get("a1")!.status, "sent");
+});
+
+test("SMS routing consistently creates SMS users and spaces with the selected sender", async () => {
+  const photon = fakePhoton((_, path, body) => {
+    if (path.endsWith("/users")) return [200, { id: "recipient", kind: "human" }];
+    if (path.endsWith("/spaces")) return [200, { id: "sms-space" }];
+    if (path.endsWith("/messages")) return [202, { id: "sms-message" }];
+    return [404, {}];
+  });
+  const sender = new PhotonApiSender({ ...baseConfig, mode: "photon_api", photonPlatform: "sms", photonSenderId: "sms-line" }, photon.fetchImpl);
+  await sender.sendText("+15555550123", "details", "sms-alert");
+  assert.equal(photon.calls[0].body.platform, "sms");
+  assert.deepEqual(photon.calls[1].body, { participantIds: ["sms-line", "recipient"], platform: "sms" });
+  assert.equal(photon.calls[2].body.senderId, "sms-line");
+  await assert.rejects(sender.sendText("somebody@example.com", "details"), /E.164/);
+  assert.throws(() => parseAlert(alert({ channel: "call", phone: "somebody@example.com" })), /E.164/);
+});
+
+test("voice gateway client uses the persisted key and returns an existing terminal outcome", async () => {
+  let request: any;
+  const sender = new GatewayVoiceSender("http://voice", TOKEN, (async (_, init) => {
+    request = JSON.parse(String(init!.body));
+    return new Response(JSON.stringify({ status: "completed" }));
+  }) as typeof fetch);
+  assert.equal(await sender.call(alert({ channel: "call" }), "a1:call:1"), "completed");
+  assert.equal(request.key, "a1:call:1");
+  assert.equal(request.phone, "+15555550123");
+  assert.match(request.script, /Details sent by text/);
+  assert.equal(request.test_call, undefined);
+  const testAlert = parseAlert(alert({ channel: "call", test_call: true }));
+  assert.equal(await sender.call(testAlert, "test:call:1"), "completed");
+  assert.equal(request.test_call, true);
+  assert.throws(() => parseAlert({ ...alert(), test_call: "true" }), /test_call must be a boolean/);
+});
+
+test("dry-run configuration disables real voice even when a gateway URL is set", async () => {
+  const sender = new FakeSender();
+  const backend = fakeBackend();
+  const { deliveries, store } = createNotifier({ ...baseConfig, storePath: tempStore(),
+    voiceGatewayUrl: "http://127.0.0.1:9" }, sender, { fetchImpl: backend.fetchImpl });
+  deliveries.accept(alert({ channel: "call" }));
+  await deliveries.idle();
+  deliveries.stop();
+  assert.equal(store.get("a1")!.voiceAttempts, undefined);
+  assert.equal(store.get("a1")!.status, "sent");
+  assert.equal(sender.sent.length, 1);
 });

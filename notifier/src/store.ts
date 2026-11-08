@@ -2,8 +2,8 @@ import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 
 export type Channel = "text" | "call";
-export type SendStatus = "queued" | "sending" | "sent" | "failed";
-export type BackendStatus = "sent" | "text_fallback" | "failed";
+export type SendStatus = "queued" | "sending" | "calling" | "waiting_retry" | "cancelled" | "sent" | "failed";
+export type BackendStatus = "sent" | "text_fallback" | "failed" | "calling" | "missed";
 
 export interface AlertPayload {
   alert_id: string;
@@ -14,6 +14,7 @@ export interface AlertPayload {
   url: string;
   channel: Channel;
   severity?: number;
+  test_call?: boolean;
 }
 
 export interface DeliveryRecord {
@@ -21,6 +22,13 @@ export interface DeliveryRecord {
   status: SendStatus;
   attempts: number;
   messageId?: string;
+  voiceAttempts?: number;
+  callJobKey?: string;
+  voiceOutcome?: string;
+  nextCallAt?: string;
+  detailTextSent?: boolean;
+  fallbackTextSent?: boolean;
+  callbackRevision?: number;
   error?: string;
   /** Status to report back to the backend, once known. */
   backendStatus?: BackendStatus;

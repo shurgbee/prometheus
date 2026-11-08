@@ -14,7 +14,33 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parents[1]
 
 
+async def preflight_database(settings):
+    """Check once before spawning children so a bad credential has one actionable error."""
+    from sqlalchemy import text
+    from sqlalchemy.engine import make_url
+    from sqlalchemy.exc import SQLAlchemyError
+    from finance_hub.db import Database
+
+    db = Database(settings)
+    try:
+        async with db.engine.connect() as connection:
+            await connection.execute(text("SELECT 1"))
+    except (SQLAlchemyError, OSError) as error:
+        if "password authentication failed" in str(error):
+            url = make_url(settings.database_url.replace("postgres://", "postgresql://", 1))
+            reason = "contains no password" if not url.password else "has a rejected username/password"
+            raise SystemExit(f"Database login failed: DATABASE_URL {reason}. Update it in the root .env "
+                             "with the full Tiger connection URL, including its password; percent-encode "
+                             "special characters in the password. No services were started.") from None
+        raise SystemExit("Database connection failed. Check DATABASE_URL, database availability and network access. "
+                         "No services were started.") from None
+    finally:
+        await db.close()
+
+
 def main():
+    import asyncio
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seed", action="store_true", help="Load smoke-test fixtures if holdings are empty")
     parser.add_argument("--api-port", type=int, default=8000)
@@ -27,8 +53,8 @@ def main():
     next_cli = ROOT / "finhub/node_modules/next/dist/bin/next"
     if not next_cli.exists():
         raise SystemExit("Install frontend dependencies first: cd finhub && npm ci")
+    asyncio.run(preflight_database(settings))
     if args.seed:
-        import asyncio
         from sqlalchemy import func, select
         from finance_hub.db import Database, Holding
         from finance_hub.seed import load

@@ -11,13 +11,14 @@ class Settings(BaseSettings):
     checkpoint_sqlite_path: str = "./checkpoints.db"
     cors_origins: list[str] = ["http://localhost:3000"]
     nvidia_api_key: str = ""
-    super_base_url: str = "https://integrate.api.nvidia.com/v1"
+    nvidia_base_url: str = "https://integrate.api.nvidia.com/v1"
+    super_base_url: str = ""
     super_model: str = "nvidia/nemotron-3-super-120b-a12b"
     super_api_key: str = ""
-    nano_base_url: str = "https://integrate.api.nvidia.com/v1"
+    nano_base_url: str = ""
     nano_model: str = "nvidia/nemotron-3-nano-30b-a3b"
     nano_api_key: str = ""
-    embed_base_url: str = "https://integrate.api.nvidia.com/v1"
+    embed_base_url: str = ""
     embed_model: str = "nvidia/llama-nemotron-embed-vl-1b-v2"
     embed_api_key: str = ""
     embed_dimensions: int = Field(default=2048, ge=8, le=4096)
@@ -31,6 +32,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def live_requirements(self):
+        for role in ("super", "nano", "embed"):
+            field = f"{role}_base_url"
+            endpoint = getattr(self, field).strip() or self.nvidia_base_url.strip()
+            setattr(self, field, endpoint.rstrip("/"))
         if not self.demo_mode:
             required = {
                 "NVIDIA_API_KEY (or separate SUPER/NANO/EMBED_API_KEY values)":

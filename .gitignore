@@ -1,4 +1,7 @@
 .env
+.env.voice
+infra/voice/data/
+infra/voice/runtime/
 .venv/
 __pycache__/
 .pytest_cache/
